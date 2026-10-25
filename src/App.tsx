@@ -8,32 +8,18 @@ import { Header } from './components/layout/Header';
 import { NavigationTabs } from './components/layout/NavigationTabs';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { EditorContainer } from './components/editor/EditorContainer';
+import { useCircuitStore } from './stores/useCircuitStore';
+import { useCodeStore } from './stores/useCodeStore';
 import type { ViewMode } from './types/circuit';
-
-const DEFAULT_ARDUINO_SKETCH = `// Sketch básico de Arduino Uno
-// Parpadeo de LED en pin 13
-
-void setup() {
-  pinMode(13, OUTPUT);
-  Serial.begin(9600);
-  Serial.println("Arduino inicializado!");
-}
-
-void loop() {
-  digitalWrite(13, HIGH);
-  delay(1000);
-  digitalWrite(13, LOW);
-  delay(1000);
-}
-`;
 
 export function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [activeView, setActiveView] = useState<ViewMode>('circuit');
-  const [code, setCode] = useState(DEFAULT_ARDUINO_SKETCH);
+  const { components, wires, loadCircuit } = useCircuitStore();
+  const { code, setCode, blocklyXml, setBlocklyXml } = useCodeStore();
 
   const handleToggleRun = () => {
-    setIsRunning(prev => !prev);
+    setIsRunning((prev) => !prev);
   };
 
   const handleReset = () => {
@@ -45,16 +31,15 @@ export function App() {
       version: '1.0.0',
       timestamp: new Date().toISOString(),
       code,
-      components: [
-        { id: 'arduino-1', type: 'arduino-uno', x: 120, y: 80 }
-      ],
-      wires: []
+      blocklyXml,
+      components,
+      wires,
     };
     const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'arduino_circuito.json';
+    a.download = 'proyecto_arduino.json';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -72,6 +57,12 @@ export function App() {
             const data = JSON.parse(event.target?.result as string);
             if (data.code) {
               setCode(data.code);
+            }
+            if (data.blocklyXml) {
+              setBlocklyXml(data.blocklyXml);
+            }
+            if (data.components && data.wires) {
+              loadCircuit(data.components, data.wires);
             }
           } catch (err) {
             console.error('Error al importar archivo JSON:', err);
@@ -94,7 +85,7 @@ export function App() {
         onImport={handleImport}
       />
 
-      {/* 2. Barra de Navegación por Pestañas (Visible en móviles o para seleccionar vista activa) */}
+      {/* 2. Barra de Navegación por Pestañas */}
       <NavigationTabs
         activeView={activeView}
         onChangeView={setActiveView}
@@ -109,9 +100,7 @@ export function App() {
 
         <div className={`h-full w-full ${activeView !== 'circuit' ? 'block' : 'hidden md:block md:w-1/2'}`}>
           <EditorContainer
-            activeView={activeView === 'circuit' ? 'code' : activeView}
-            code={code}
-            onChangeCode={setCode}
+            activeView={activeView === 'circuit' ? 'blocks' : activeView}
           />
         </div>
       </main>

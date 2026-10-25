@@ -6,6 +6,39 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [0.3.0] - 2026-10-24 - Sprint 3: Integración de Google Blockly y CodeMirror (Sincronización en Tiempo Real)
+
+### Añadido
+- **Google Blockly Offline (`BlocklyWorkspace.tsx`):**
+  - Espacio de trabajo de programación visual táctil, con soporte de gestos (pellizcar para zoom, arrastre de bloques y eliminación interactiva con papelera).
+  - Caja de herramientas (Toolbox) en español estructurada pedagógicamente:
+    - 🟢 **Estructura:** Bloque base `arduino_base` (`void setup()` y `void loop()`), configuración de pines `pinMode` (OUTPUT, INPUT, INPUT_PULLUP).
+    - ⚡ **Digital:** Escritura digital `digitalWrite` (HIGH/LOW) y lectura `digitalRead`.
+    - 〰️ **Analógico & PWM:** Escritura de modulador de ancho de pulsos `analogWrite` (0 a 255) y lectura analógica de 10 bits `analogRead` (A0 a A5).
+    - ⏱️ **Tiempo:** Bloque de espera `delay(ms)` con bloques numéricos sombra.
+    - ⚙️ **Servos & Sensores:** Control angular de servomotor SG90 (0° a 180°) y lectura de distancia ultrasónica HC-SR04 en centímetros.
+    - 📟 **Monitor Serial:** Impresión con y sin salto de línea (`Serial.println` y `Serial.print`).
+    - 🔀 **Lógica & Control:** Condicionales `if/else`, comparaciones y operadores booleanos.
+    - 🔢 **Matemáticas & Variables:** Operaciones aritméticas y variables dinámicas.
+
+- **Generador C++ de Arduino para Blockly (`arduinoGenerator.ts`):**
+  - Motor de traducción automática desde el árbol de bloques a código estándar C++ de Arduino (`.ino`).
+  - Detección e inclusión automática de cabeceras requeridas (`#include <Servo.h>`) e instanciación de objetos de servos.
+  - Generación de funciones auxiliares integradas para cálculo de pulsos de sensor ultrasónico (`readUltrasonicDistance`).
+  - Inicialización automática de `Serial.begin(9600)` al detectar bloques de comunicación serial.
+
+- **Editor CodeMirror C++ (`CodeMirrorEditor.tsx`):**
+  - Editor de código profesional con syntax highlighting C++, números de línea, autocompletado y tema oscuro.
+  - Indicador de estado dinámico ("Sincronizado con Bloques" vs "Modo Manual").
+  - Botón de descarga directa de archivo ejecutable de Arduino `sketch.ino`.
+  - Botón de copiado al portapapeles con confirmación visual.
+
+- **Sincronización Bidireccional (`useCodeStore.ts`):**
+  - Reactividad inmediata: cualquier cambio, movimiento o ajuste de parámetro en los bloques traduce y actualiza el código C++ en tiempo real en memoria y en la vista de código.
+  - Serialización XML de los bloques incluida en el esquema JSON del proyecto para guardado y restauración fiel.
+
+---
+
 ## [0.2.0] - 2026-10-24 - Sprint 2: Estado Global (Zustand) y UI Táctil "Tocar y Tocar"
 
 ### Añadido
