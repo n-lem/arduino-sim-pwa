@@ -11,7 +11,8 @@ export type ComponentType =
   | 'servo-sg90'
   | 'ultrasonic-hcsr04'
   | 'potentiometer'
-  | 'buzzer';
+  | 'buzzer'
+  | 'battery';
 
 export type PinType = 'digital' | 'analog' | 'power' | 'ground' | 'pwm' | 'passive';
 

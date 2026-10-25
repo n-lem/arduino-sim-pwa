@@ -1,6 +1,8 @@
 /**
  * @file useSimulationLoop.ts
- * @description Hook de negocio que acopla el emulador AVR8js con el solver de física eléctrica y el circuito.
+ * @description Hook de negocio que acopla el intérprete del sketch con el solver eléctrico y el circuito.
+ * Los pines de salida del sketch alimentan al solver; las tensiones resultantes vuelven al sketch
+ * como lecturas de digitalRead/analogRead/pulseIn y a los componentes como estado visual.
  */
 
 import { useEffect, useRef } from 'react';
@@ -10,8 +12,11 @@ import { useCircuitStore } from '../stores/useCircuitStore';
 import { useSimulationStore } from '../stores/useSimulationStore';
 import { useCodeStore } from '../stores/useCodeStore';
 
+/** Umbral lógico de entrada de un ATmega328P alimentado a 5 V. */
+const LOGIC_HIGH_VOLTS = 2.5;
+
 export function useSimulationLoop() {
-  const { isRunning, setIsRunning, addSerialLog } = useSimulationStore();
+  const { isRunning, setIsRunning, addSerialLog, setWarnings, setMeasurements } = useSimulationStore();
   const { components, wires, updateComponentProperty } = useCircuitStore();
   const { code } = useCodeStore();
 
@@ -23,64 +28,73 @@ export function useSimulationLoop() {
     wiresRef.current = wires;
   }, [components, wires]);
 
-  // Función para re-evaluar la física eléctrica completa del circuito
+  /** Resuelve el circuito y propaga el resultado a los componentes y al microcontrolador. */
   const evaluatePhysics = () => {
-    const currentComponents = componentsRef.current;
-    const currentWires = wiresRef.current;
+    const current = componentsRef.current;
+    const result = solveCircuitPhysics(current, wiresRef.current, avrSimulator.pinStates);
 
-    const { ledStates, servoAngles } = solveCircuitPhysics(
-      currentComponents,
-      currentWires,
-      avrSimulator.pinStates
-    );
+    const setIfChanged = (id: string, prop: string, value: unknown) => {
+      const comp = current.find((c) => c.id === id);
+      if (comp && comp.properties[prop] !== value) updateComponentProperty(id, prop, value);
+    };
 
-    // Actualizar LEDs según diferencia de potencial real (Ánodo > Cátodo >= 1.8V)
-    currentComponents.filter((c) => c.type === 'led').forEach((led) => {
-      const shouldBeOn = Boolean(ledStates[led.id]);
-      if (led.properties.isOn !== shouldBeOn) {
-        updateComponentProperty(led.id, 'isOn', shouldBeOn);
-      }
-    });
+    for (const led of current.filter((c) => c.type === 'led')) {
+      setIfChanged(led.id, 'isOn', Boolean(result.ledStates[led.id]));
+      setIfChanged(led.id, 'current', Math.round(result.ledCurrents[led.id] ?? 0));
+      if (result.burnedLeds.includes(led.id)) setIfChanged(led.id, 'burned', true);
+    }
 
-    // Actualizar Servomotores
-    currentComponents.filter((c) => c.type === 'servo-sg90').forEach((servo) => {
-      if (servoAngles[servo.id] !== undefined) {
-        updateComponentProperty(servo.id, 'angle', servoAngles[servo.id]);
-      }
-    });
+    for (const servo of current.filter((c) => c.type === 'servo-sg90')) {
+      setIfChanged(servo.id, 'powered', Boolean(result.servoPowered[servo.id]));
+      if (result.servoAngles[servo.id] !== undefined) setIfChanged(servo.id, 'angle', result.servoAngles[servo.id]);
+    }
+
+    for (const [pin, state] of Object.entries(avrSimulator.pinStates)) {
+      if (state.mode === 'OUTPUT') continue;
+      const volts = result.pinVoltages[pin] ?? 0;
+      avrSimulator.setExternalInput(pin, volts >= LOGIC_HIGH_VOLTS);
+      avrSimulator.setAnalogInput(pin, (volts / 5) * 1023);
+    }
+    for (const [pin, micros] of Object.entries(result.pulseMicros)) avrSimulator.setPulseInput(pin, micros);
+
+    setWarnings(result.warnings);
+    setMeasurements(result.measurements, result.buzzerOn);
   };
 
   useEffect(() => {
-    // Escuchar salida serie del UART
-    avrSimulator.setSerialListener((text) => {
-      addSerialLog(text);
+    avrSimulator.setSerialListener((text) => addSerialLog(text));
+    avrSimulator.setErrorListener((msg) => {
+      addSerialLog(`⚠ ${msg}\n`);
+      setIsRunning(false);
     });
+    avrSimulator.setPinListener(() => evaluatePhysics());
+  }, [addSerialLog, updateComponentProperty, setIsRunning]);
 
-    // Escuchar cambios de pines y resolver física de circuito en tiempo real
-    avrSimulator.setPinListener(() => {
-      evaluatePhysics();
-    });
-  }, [addSerialLog, updateComponentProperty]);
-
-  // Si el usuario agrega o quita cables mientras corre la simulación, re-evaluar inmediatamente
+  // Si el usuario cambia cables o componentes (p. ej. presiona un pulsador) mientras corre, re-evaluar.
   useEffect(() => {
-    if (isRunning) {
-      evaluatePhysics();
-    }
+    if (isRunning) evaluatePhysics();
   }, [wires, components, isRunning]);
 
-  // Manejo de inicio, reinicio o cambio de código
+  // Inicio, detención o cambio de código
   useEffect(() => {
     if (isRunning) {
+      // Una nueva corrida repara los componentes quemados en la corrida anterior.
+      const burned = componentsRef.current.filter((c) => c.type === 'led' && c.properties.burned);
+      burned.forEach((c) => updateComponentProperty(c.id, 'burned', false));
+      componentsRef.current = componentsRef.current.map((c) =>
+        burned.includes(c) ? { ...c, properties: { ...c.properties, burned: false } } : c
+      );
+      avrSimulator.clearExternalInputs();
       avrSimulator.startSketch(code);
       evaluatePhysics();
     } else {
       avrSimulator.stop();
-      // Apagar todos los LEDs al detener
-      components.forEach((c) => {
-        if (c.type === 'led' && c.properties.isOn) {
-          updateComponentProperty(c.id, 'isOn', false);
-        }
+      setWarnings([]);
+      setMeasurements({}, {});
+      componentsRef.current.forEach((c) => {
+        if (c.type !== 'led') return;
+        if (c.properties.isOn) updateComponentProperty(c.id, 'isOn', false);
+        if (c.properties.current) updateComponentProperty(c.id, 'current', 0);
       });
     }
 
@@ -95,8 +109,13 @@ export function useSimulationLoop() {
     resetSimulation: () => {
       setIsRunning(false);
       avrSimulator.reset();
-      components.forEach((c) => {
-        if (c.type === 'led') updateComponentProperty(c.id, 'isOn', false);
+      avrSimulator.clearExternalInputs();
+      setWarnings([]);
+      componentsRef.current.forEach((c) => {
+        if (c.type !== 'led') return;
+        updateComponentProperty(c.id, 'isOn', false);
+        updateComponentProperty(c.id, 'current', 0);
+        updateComponentProperty(c.id, 'burned', false);
       });
     },
   };

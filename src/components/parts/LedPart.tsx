@@ -20,7 +20,9 @@ export const LedPart: React.FC<LedPartProps> = ({
   onPinTouch,
   isRunning = false,
 }) => {
-  const isOn = Boolean(component.properties.isOn && isRunning);
+  const burned = Boolean(component.properties.burned);
+  const isOn = Boolean(component.properties.isOn && isRunning && !burned);
+  const glow = Math.min(1, 0.25 + (Number(component.properties.current) || 0) / 20);
   const color = component.properties.color || '#EF4444';
 
   const anodePin = component.pins.find((p) => p.id === 'anode') || { id: 'anode', x: 20, y: 56, name: '+' };
@@ -40,7 +42,15 @@ export const LedPart: React.FC<LedPartProps> = ({
 
         {/* Resplandor cuando está encendido */}
         {isOn && (
-          <circle cx="29" cy="22" r="24" fill={color} opacity="0.45" className="animate-pulse" />
+          <circle cx="29" cy="22" r="24" fill={color} opacity={0.45 * glow} className="animate-pulse" />
+        )}
+
+        {/* LED quemado: cúpula negra con una cruz */}
+        {burned && (
+          <g>
+            <path d="M 18 34 A 12 12 0 1 1 40 34 Z" fill="#111827" stroke="#000" strokeWidth="1.5" />
+            <path d="M 23 14 L 35 26 M 35 14 L 23 26" stroke="#F87171" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
         )}
 
         {/* Cuerpo plástico del LED (Cúpula) */}

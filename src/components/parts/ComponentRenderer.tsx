@@ -12,6 +12,9 @@ import { ResistorPart } from './ResistorPart';
 import { PushbuttonPart } from './PushbuttonPart';
 import { ServoPart } from './ServoPart';
 import { UltrasonicPart } from './UltrasonicPart';
+import { BatteryPart } from './BatteryPart';
+import { BuzzerPart } from './BuzzerPart';
+import { PotentiometerPart } from './PotentiometerPart';
 import { Trash2 } from 'lucide-react';
 
 interface ComponentRendererProps {
@@ -86,6 +89,9 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      // Sin esto el click burbujea al lienzo, que deselecciona el componente justo después de tocarlo.
+      onClick={(e) => e.stopPropagation()}
       className={`absolute cursor-move transition-shadow ${
         isSelected ? 'ring-2 ring-arduino-teal/80 ring-offset-2 ring-offset-slate-950 rounded-lg' : ''
       }`}
@@ -154,6 +160,22 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
           selectedPin={selectedPin}
           onPinTouch={onPinTouch}
           onDistanceChange={(cm) => onPropertyChange(component.id, 'distanceCm', cm)}
+        />
+      )}
+      {component.type === 'battery' && (
+        <BatteryPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />
+      )}
+
+      {component.type === 'buzzer' && (
+        <BuzzerPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} isRunning={isRunning} />
+      )}
+
+      {component.type === 'potentiometer' && (
+        <PotentiometerPart
+          component={component}
+          selectedPin={selectedPin}
+          onPinTouch={onPinTouch}
+          onValueChange={(value) => onPropertyChange(component.id, 'value', value)}
         />
       )}
     </div>

@@ -69,7 +69,8 @@ export const BlocklyWorkspace: React.FC = () => {
 
     workspaceRef.current = workspace;
 
-    // Restaurar estado previo o inicializar con un sketch de parpadeo completo con números encastrados
+    // Restaurar estado previo o inicializar con un sketch de parpadeo completo con números encastrados.
+    // Los eventos se silencian: la carga no debe disparar la regeneración (y pisar el código manual).
     if (blocklyXml) {
       try {
         const dom = Blockly.utils.xml.textToDom(blocklyXml);
@@ -78,90 +79,60 @@ export const BlocklyWorkspace: React.FC = () => {
         console.error('Error al restaurar bloques guardados:', err);
       }
     } else {
-      // Bloque inicial base
-      const baseBlock = workspace.newBlock('arduino_base');
-      baseBlock.initSvg();
-      baseBlock.render();
-      baseBlock.moveBy(30, 25);
-
-      // Bloque pinMode 13 OUTPUT en setup
-      const pinModeBlock = workspace.newBlock('arduino_pin_mode');
-      pinModeBlock.initSvg();
-      pinModeBlock.render();
-      const setupInput = baseBlock.getInput('SETUP');
-      if (setupInput?.connection && pinModeBlock.previousConnection) {
-        setupInput.connection.connect(pinModeBlock.previousConnection);
-      }
-
-      // Bloque digitalWrite 13 HIGH en loop
-      const dwHighBlock = workspace.newBlock('arduino_digital_write');
-      dwHighBlock.setFieldValue('HIGH', 'STATE');
-      dwHighBlock.initSvg();
-      dwHighBlock.render();
-      const loopInput = baseBlock.getInput('LOOP');
-      if (loopInput?.connection && dwHighBlock.previousConnection) {
-        loopInput.connection.connect(dwHighBlock.previousConnection);
-      }
-
-      // Bloque delay 1000 (con bloque numérico 1000 encastrado sin huecos vacíos)
-      const delay1 = workspace.newBlock('arduino_delay');
-      delay1.initSvg();
-      delay1.render();
-      if (dwHighBlock.nextConnection && delay1.previousConnection) {
-        dwHighBlock.nextConnection.connect(delay1.previousConnection);
-      }
-
-      const numBlock1 = workspace.newBlock('math_number');
-      numBlock1.setFieldValue('1000', 'NUM');
-      numBlock1.initSvg();
-      numBlock1.render();
-      const delayInput1 = delay1.getInput('MS');
-      if (delayInput1?.connection && numBlock1.outputConnection) {
-        delayInput1.connection.connect(numBlock1.outputConnection);
-      }
-
-      // Bloque digitalWrite 13 LOW
-      const dwLowBlock = workspace.newBlock('arduino_digital_write');
-      dwLowBlock.setFieldValue('LOW', 'STATE');
-      dwLowBlock.initSvg();
-      dwLowBlock.render();
-      if (delay1.nextConnection && dwLowBlock.previousConnection) {
-        delay1.nextConnection.connect(dwLowBlock.previousConnection);
-      }
-
-      // Bloque delay 1000 (con bloque numérico 1000 encastrado sin huecos vacíos)
-      const delay2 = workspace.newBlock('arduino_delay');
-      delay2.initSvg();
-      delay2.render();
-      if (dwLowBlock.nextConnection && delay2.previousConnection) {
-        dwLowBlock.nextConnection.connect(delay2.previousConnection);
-      }
-
-      const numBlock2 = workspace.newBlock('math_number');
-      numBlock2.setFieldValue('1000', 'NUM');
-      numBlock2.initSvg();
-      numBlock2.render();
-      const delayInput2 = delay2.getInput('MS');
-      if (delayInput2?.connection && numBlock2.outputConnection) {
-        delayInput2.connection.connect(numBlock2.outputConnection);
-      }
+      // Sketch inicial (parpadeo). Se carga desde XML para que Blockly conecte bien los números a cada "Esperar".
+      const seed = `<xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="arduino_base" x="30" y="25">
+          <statement name="SETUP"><block type="arduino_pin_mode"></block></statement>
+          <statement name="LOOP">
+            <block type="arduino_digital_write"><field name="STATE">HIGH</field>
+              <next><block type="arduino_delay"><value name="MS"><block type="math_number"><field name="NUM">1000</field></block></value>
+                <next><block type="arduino_digital_write"><field name="STATE">LOW</field>
+                  <next><block type="arduino_delay"><value name="MS"><block type="math_number"><field name="NUM">1000</field></block></value></block></next>
+                </block></next>
+              </block></next>
+            </block>
+          </statement>
+        </block>
+      </xml>`;
+      Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(seed), workspace);
     }
+
+    // Repara proyectos guardados con "Esperar" vacío: conecta el número suelto o crea uno de 1000 ms.
+    let repaired = false;
+    workspace.getBlocksByType('arduino_delay', false).forEach((delayBlock) => {
+      const input = delayBlock.getInput('MS');
+      if (!input || input.connection?.targetBlock()) return;
+      repaired = true;
+      const orphan = workspace.getTopBlocks(false).find((b) => b.type === 'math_number');
+      const num = orphan ?? workspace.newBlock('math_number');
+      if (!orphan) {
+        num.setFieldValue('1000', 'NUM');
+        num.initSvg();
+        num.render();
+      }
+      input.connection?.connect(num.outputConnection!);
+    });
+    const serialize = () => Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+    let lastXml = serialize();
 
     // Listener para traducción en tiempo real a C++ y serialización
     const changeListener = (event: any) => {
       // Ignorar eventos que no cambian el contenido visual o semántico
-      if (event && event.type === Blockly.Events.VIEWPORT_CHANGE) return;
-
-      const generatedCpp = generateArduinoCode(workspace);
-      setCode(generatedCpp);
-
-      const dom = Blockly.Xml.workspaceToDom(workspace);
-      const xmlText = Blockly.Xml.domToText(dom);
+      if (event && (event.type === Blockly.Events.VIEWPORT_CHANGE || event.isUiEvent)) return;
+      // Eventos de carga/montaje no cambian los bloques: no deben pisar el código escrito a mano.
+      const xmlText = serialize();
+      if (xmlText === lastXml) return;
+      lastXml = xmlText;
+      setCode(generateArduinoCode(workspace));
       setBlocklyXml(xmlText);
     };
 
     workspace.addChangeListener(changeListener);
-    changeListener(null);
+    // Solo se genera al montar un proyecto nuevo (sin bloques guardados); si no, se respeta el código existente.
+    if (!blocklyXml || repaired) {
+      setCode(generateArduinoCode(workspace));
+      setBlocklyXml(lastXml);
+    }
 
     // Redimensionamiento responsive
     const handleResize = () => {
@@ -181,3 +152,5 @@ export const BlocklyWorkspace: React.FC = () => {
     </div>
   );
 };
+
+

@@ -3,13 +3,15 @@
  * @description Lienzo interactivo conectado al store global con soporte del sistema "Tocar y Tocar" y arrastre.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ComponentPalette } from './ComponentPalette';
+import { PropertiesPanel } from './PropertiesPanel';
 import { WireLayer } from './WireLayer';
 import { ComponentRenderer } from '../parts/ComponentRenderer';
 import { useCircuitStore } from '../../stores/useCircuitStore';
+import { useSimulationStore } from '../../stores/useSimulationStore';
 import type { ComponentType } from '../../types/circuit';
-import { ZoomIn, ZoomOut, RotateCcw, XCircle, CheckCircle2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface CircuitCanvasProps {
   isRunning: boolean;
@@ -31,6 +33,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
     removeWire,
   } = useCircuitStore();
 
+  const warnings = useSimulationStore((s) => s.warnings);
   const [zoom, setZoom] = useState(1);
   const [wireNotice, setWireNotice] = useState<string | null>(null);
 
@@ -44,6 +47,22 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
       setTimeout(() => setWireNotice(null), 2500);
     }
   };
+
+  const selectedProps = components.find((c) => c.id === selectedComponentId);
+
+  // Supr/Retroceso elimina el componente seleccionado (salvo que se esté escribiendo en un campo).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, textarea, select, [contenteditable="true"], .cm-editor, .blocklyWidgetDiv')) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
+        const comp = useCircuitStore.getState().components.find((c) => c.id === selectedComponentId);
+        if (comp && comp.type !== 'arduino-uno') removeComponent(selectedComponentId);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedComponentId, removeComponent]);
 
   const handleAddComponent = (type: ComponentType) => {
     addComponent(type);
@@ -134,6 +153,18 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
         )}
       </div>
 
+      {/* Avisos del solver eléctrico */}
+      {warnings.length > 0 && (
+        <div className="absolute top-14 left-3 z-30 max-w-[85vw] sm:max-w-md flex flex-col gap-1 pointer-events-none">
+          {warnings.map((w) => (
+            <div key={w} className="flex items-start gap-2 bg-red-500/15 border border-red-500/50 text-red-200 px-3 py-2 rounded-xl text-xs shadow-lg backdrop-blur">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-px" />
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Contenedor del Lienzo escalable con Zoom */}
       <div
         className="w-full h-full relative"
@@ -167,7 +198,15 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
       </div>
 
       {/* Paleta Flotante de Componentes (Bottom Center) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2">
+        {selectedProps && (
+          <PropertiesPanel
+            component={selectedProps}
+            onChange={(prop, value) => updateComponentProperty(selectedProps.id, prop, value)}
+            onDelete={() => removeComponent(selectedProps.id)}
+            onClose={() => selectComponent(null)}
+          />
+        )}
         <ComponentPalette onAddComponent={handleAddComponent} />
       </div>
     </div>

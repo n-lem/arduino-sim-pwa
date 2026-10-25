@@ -143,6 +143,7 @@ long readUltrasonicDistance(int trigPin, int echoPin) {
   // Generar código desde el bloque base de Arduino
   const baseBlock = allBlocks.find((b) => b.type === 'arduino_base');
   if (baseBlock) {
+    javascriptGenerator.init(workspace);
     let rawCode = javascriptGenerator.blockToCode(baseBlock) as string;
 
     // Si se usa Serial o Servos, inyectar inicializaciones automáticas en el setup si faltasen

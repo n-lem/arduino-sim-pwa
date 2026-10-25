@@ -221,11 +221,45 @@ export function createComponentFactory(type: ComponentType, idSuffix?: string): 
         },
       };
 
+    case 'buzzer':
+      return {
+        id,
+        type: 'buzzer',
+        name: 'Buzzer',
+        x: 520,
+        y: 310,
+        rotation: 0,
+        pins: [
+          { id: 'pos', name: 'Positivo (+)', type: 'power', x: 18, y: 64 },
+          { id: 'neg', name: 'Negativo (-)', type: 'ground', x: 42, y: 64 },
+        ],
+        properties: {
+          sounding: false,
+        },
+      };
+
+    case 'battery':
+      return {
+        id,
+        type: 'battery',
+        name: 'Batería',
+        x: 320,
+        y: 260,
+        rotation: 0,
+        pins: [
+          { id: 'pos', name: 'Positivo (+)', type: 'power', x: 18, y: 12 },
+          { id: 'neg', name: 'Negativo (-)', type: 'ground', x: 42, y: 12 },
+        ],
+        properties: {
+          voltage: 9,
+        },
+      };
+
     default:
       return {
         id,
         type,
-        name: type.toUpperCase(),
+        name: String(type).toUpperCase(),
         x: 400,
         y: 100,
         rotation: 0,

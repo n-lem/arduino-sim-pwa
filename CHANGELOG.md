@@ -6,7 +6,46 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
-## [1.0.0] - 2026-10-24 - Sprint 5: Persistencia en IndexedDB, Autoguardado Offline y Sistema de Evaluación (JSON / .ino / .png)
+## [1.3.0] - Baterías, ley de Ohm y edición de componentes
+
+### Agregado
+- Componente **Batería** (1,5–12 V, editable) con resistencia interna; el circuito puede funcionar sin Arduino.
+- Dibujos de **Potenciómetro** (perilla arrastrable) y **Buzzer** (ondas al sonar).
+- **Panel de propiedades** al seleccionar: valor de resistencia (presets y texto libre, ej. `4.7k`), tensión de batería, color de LED, posición del potenciómetro, distancia del HC-SR04, reparar LED quemado.
+- **Mediciones en vivo** (V y mA) en resistencias y en el panel, para aplicar la ley de Ohm.
+- Colores de las bandas de la resistencia según su valor.
+- **Menú "Agregar componente"** desplegable y categorizado.
+- Tecla Supr/Retroceso elimina el componente seleccionado.
+
+### Corregido
+- Un componente tocado se deseleccionaba al instante (el click burbujeaba al lienzo), por lo que no se podía borrar.
+
+### Técnico
+- `core/electronics.ts` (presets, formato y parseo de unidades) con tests; solver con `measurements` y fuentes flotantes. 27 tests.
+
+## [1.2.0] - Solver eléctrico real y corrección de bugs
+
+- Nuevo solver DC por análisis nodal (MNA): un LED entre 5V y GND se quema, avisos de cortocircuito/sobrecorriente, pulsadores, potenciómetro y HC-SR04 llegan al sketch.
+- Corregido: los bloques "Esperar" iniciales quedaban con el número desconectado (`delay(0)`); ahora se siembran por XML y se reparan proyectos guardados.
+
+## [1.1.0] - 2026-10-25 - Intérprete C++ real y base de tests
+
+### Añadido
+- **Intérprete de C++ Arduino (`src/core/interpreter/`):** lexer, parser a AST y evaluador basado en generadores (cooperativo: `delay()` no congela la UI). Soporta variables tipadas con desbordamiento AVR, arrays, funciones, `if/for/while/do/switch`, `String`, `Serial`, `#define`, funciones matemáticas y de pines, `Servo`.
+- **Registro de librerías (`registerLibrary`)** como punto de extensión para librerías adicionales.
+- Errores de sintaxis/ejecución con número de línea, mostrados en el Monitor Serial.
+- Tests con Vitest (`npm test`).
+- `AvrRunner` expone `setAnalogInput`, `setPulseInput` y `setExternalInput` para sensores/pulsadores.
+
+### Cambiado
+- Se reemplazó el parser de sentencias por regex de `avrRunner.ts` por el intérprete nuevo.
+
+### Decisiones técnicas
+- Motor A (intérprete, sin avr-gcc) para funcionar 100% en navegador/celular. Tauri se usará para la versión portable de escritorio.
+
+---
+
+ - 2026-10-24 - Sprint 5: Persistencia en IndexedDB, Autoguardado Offline y Sistema de Evaluación (JSON / .ino / .png)
 
 ### Añadido
 - **Persistencia Local con IndexedDB (`storage.ts`):**

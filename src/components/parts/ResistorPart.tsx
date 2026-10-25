@@ -6,6 +6,8 @@
 import React from 'react';
 import type { CircuitComponent } from '../../types/circuit';
 import type { SelectedPinInfo } from '../../stores/useCircuitStore';
+import { useSimulationStore } from '../../stores/useSimulationStore';
+import { formatOhms, formatCurrent, resistorBandColors } from '../../core/electronics';
 
 interface ResistorPartProps {
   component: CircuitComponent;
@@ -23,7 +25,9 @@ export const ResistorPart: React.FC<ResistorPartProps> = ({
 
   const isPin1Selected = selectedPin?.componentId === component.id && selectedPin?.pinId === pin1.id;
   const isPin2Selected = selectedPin?.componentId === component.id && selectedPin?.pinId === pin2.id;
-  const resistance = component.properties.resistance || 220;
+  const resistance = Number(component.properties.resistance) || 220;
+  const bands = resistorBandColors(resistance);
+  const measurement = useSimulationStore((s) => s.measurements[component.id]);
 
   return (
     <div className="relative select-none pointer-events-auto" style={{ width: '80px', height: '32px' }}>
@@ -35,16 +39,21 @@ export const ResistorPart: React.FC<ResistorPartProps> = ({
         {/* Cuerpo cerámico / beige de la resistencia */}
         <rect x="23" y="8" width="34" height="14" rx="4" fill="#D4B996" stroke="#92400E" strokeWidth="1" />
 
-        {/* Bandas de colores (ejemplo 220 ohms: Rojo, Rojo, Marrón, Dorado) */}
-        <rect x="28" y="8" width="3" height="14" fill="#EF4444" />
-        <rect x="34" y="8" width="3" height="14" fill="#EF4444" />
-        <rect x="40" y="8" width="3" height="14" fill="#78350F" />
+        {/* Bandas de colores según el valor (código de colores real) */}
+        <rect x="28" y="8" width="3" height="14" fill={bands[0]} />
+        <rect x="34" y="8" width="3" height="14" fill={bands[1]} />
+        <rect x="40" y="8" width="3" height="14" fill={bands[2]} />
         <rect x="48" y="8" width="3" height="14" fill="#F59E0B" />
 
         {/* Etiqueta de Valor */}
         <text x="40" y="30" fill="#94A3B8" fontSize="7" fontFamily="sans-serif" textAnchor="middle">
-          {resistance >= 1000 ? `${resistance / 1000}kΩ` : `${resistance}Ω`}
+          {formatOhms(resistance)}
         </text>
+        {measurement && (
+          <text x="40" y="5" fill="#38BDF8" fontSize="6.5" fontFamily="sans-serif" textAnchor="middle">
+            {measurement.volts.toFixed(2)}V · {formatCurrent(measurement.milliamps)}
+          </text>
+        )}
 
         {/* Terminal 1 Táctil */}
         <g

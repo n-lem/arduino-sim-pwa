@@ -16,6 +16,8 @@ import {
   AVRUSART,
   usart0Config,
 } from 'avr8js';
+import { SketchRunner } from '../interpreter/sketchRunner';
+import type { Hardware } from '../interpreter/hardware';
 
 export interface PinStateMap {
   [pin: string]: {
@@ -28,42 +30,6 @@ export interface PinStateMap {
 export type PinChangeCallback = (pin: string, isHigh: boolean, value: number) => void;
 export type SerialOutputCallback = (text: string) => void;
 
-/**
- * Extrae el cuerpo de una función en C++ balanceando las llaves { }.
- */
-function extractFunctionBody(code: string, funcName: string): string {
-  const funcRegex = new RegExp(`void\\s+${funcName}\\s*\\(\\s*\\)\\s*\\{`, 'm');
-  const match = code.match(funcRegex);
-  if (!match || match.index === undefined) return '';
-
-  let startIndex = match.index + match[0].length;
-  let depth = 1;
-  let endIndex = startIndex;
-
-  for (let i = startIndex; i < code.length; i++) {
-    if (code[i] === '{') depth++;
-    else if (code[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        endIndex = i;
-        break;
-      }
-    }
-  }
-
-  return code.substring(startIndex, endIndex);
-}
-
-/**
- * Descompone el cuerpo de una función en sentencias individuales ejecutables.
- */
-function parseStatements(body: string): string[] {
-  return body
-    .split(';')
-    .map((s) => s.trim().replace(/\/\/.*/g, '')) // Limpiar espacios y comentarios de una línea
-    .filter(Boolean);
-}
-
 export class AvrRunner {
   public cpu: CPU;
   public portB: AVRIOPort;
@@ -74,8 +40,11 @@ export class AvrRunner {
   public timer2: AVRTimer;
   public usart: AVRUSART;
 
-  private isRunning = false;
-  private intervalId: any = null;
+  private sketch = new SketchRunner((msg) => this.onErrorCallback?.(msg));
+  private onErrorCallback: ((message: string) => void) | null = null;
+  private inputLevels: Record<string, number> = {};
+  private analogInputs: Record<string, number> = {};
+  private pulseInputs: Record<string, number> = {};
   private onPinChangeCallback: PinChangeCallback | null = null;
   private onSerialOutputCallback: SerialOutputCallback | null = null;
 
@@ -156,117 +125,84 @@ export class AvrRunner {
     this.onSerialOutputCallback = callback;
   }
 
+  /** Registra el nivel eléctrico de un pin de entrada (calculado por el solver) para digitalRead. */
   public setExternalInput(pin: string, isHigh: boolean) {
-    const pinNum = parseInt(pin, 10);
-    if (!isNaN(pinNum)) {
-      if (pinNum >= 8 && pinNum <= 13) {
-        this.portB.setPin(pinNum - 8, isHigh);
-      } else if (pinNum >= 0 && pinNum <= 7) {
-        this.portD.setPin(pinNum, isHigh);
-      }
-    }
+    this.inputLevels[pin] = isHigh ? 1 : 0;
   }
 
+  /** Fija la lectura analógica (0..1023) de un pin A0..A5 (clave "A0"). */
+  public setAnalogInput(pin: string, value: number) {
+    this.analogInputs[pin] = Math.max(0, Math.min(1023, Math.round(value)));
+  }
+
+  /** Fija la duración (µs) que devolverá pulseIn() para un pin (p. ej. eco de un HC-SR04). */
+  public setPulseInput(pin: string, micros: number) {
+    this.pulseInputs[pin] = micros;
+  }
+
+  /** Borra las entradas externas (al detener o reiniciar la simulación). */
+  public clearExternalInputs() {
+    this.inputLevels = {};
+    this.analogInputs = {};
+    this.pulseInputs = {};
+  }
+
+  public setErrorListener(callback: (message: string) => void) {
+    this.onErrorCallback = callback;
+  }
+
+  private pinKey(pin: number): string {
+    return pin >= 14 ? `A${pin - 14}` : String(pin);
+  }
+
+  /** Adaptador entre el intérprete y los pines/serie simulados. */
+  private createHardware(): Hardware {
+    const startedAt = performance.now();
+    return {
+      pinMode: (pin, mode) => {
+        const key = this.pinKey(pin);
+        const s = this.pinStates[key];
+        if (!s) return;
+        s.mode = mode === 1 ? 'OUTPUT' : mode === 2 ? 'INPUT_PULLUP' : 'INPUT';
+        this.onPinChangeCallback?.(key, s.isHigh, s.value);
+      },
+      digitalWrite: (pin, v) => this.updatePinState(this.pinKey(pin), v === 1, v === 1 ? 255 : 0),
+      analogWrite: (pin, v) => this.updatePinState(this.pinKey(pin), v > 0, v),
+      digitalRead: (pin) => {
+        const key = this.pinKey(pin);
+        const st = this.pinStates[key];
+        if (st?.mode === 'OUTPUT') return st.isHigh ? 1 : 0;
+        return this.inputLevels[key] ?? (st?.mode === 'INPUT_PULLUP' ? 1 : 0);
+      },
+      analogRead: (pin) => this.analogInputs[this.pinKey(pin)] ?? 0,
+      serialWrite: (text) => this.onSerialOutputCallback?.(text),
+      serialAvailable: () => 0,
+      serialRead: () => -1,
+      servoWrite: (pin, angle) => {
+        const key = this.pinKey(pin);
+        if (this.pinStates[key]) this.pinStates[key].mode = 'OUTPUT';
+        this.updatePinState(key, true, angle);
+      },
+      millis: () => Math.floor(performance.now() - startedAt),
+      micros: () => Math.floor((performance.now() - startedAt) * 1000),
+      pulseIn: (pin) => this.pulseInputs[this.pinKey(pin)] ?? 0,
+      tone: () => {},
+      noTone: () => {},
+    };
+  }
+
+  /**
+   * Ejecuta el sketch con el intérprete C++. Los errores se informan por el listener de errores.
+   * @param code Código fuente del sketch.
+   */
   public startSketch(code: string) {
     this.stop();
-    this.isRunning = true;
     this.initDefaultPinStates();
-
-    const setupBody = extractFunctionBody(code, 'setup');
-    const loopBody = extractFunctionBody(code, 'loop');
-
-    const setupStatements = parseStatements(setupBody);
-    const loopStatements = parseStatements(loopBody);
-
-    // 1. Ejecutar setup()
-    for (const stmt of setupStatements) {
-      this.executeStatement(stmt);
-    }
-
-    if (loopStatements.length === 0) return;
-
-    // 2. Ejecutar loop() paso a paso con delays fieles
-    let stmtIndex = 0;
-
-    const step = () => {
-      if (!this.isRunning) return;
-
-      const currentStmt = loopStatements[stmtIndex];
-      stmtIndex = (stmtIndex + 1) % loopStatements.length;
-
-      let delayTime = 15; // Tiempo mínimo por instrucción en milisegundos
-
-      // Detectar llamada a delay(X)
-      const delayMatch = currentStmt.match(/delay\s*\(\s*(\d+)\s*\)/);
-      if (delayMatch) {
-        delayTime = Math.max(10, parseInt(delayMatch[1], 10));
-      } else {
-        this.executeStatement(currentStmt);
-      }
-
-      this.intervalId = setTimeout(step, delayTime);
-    };
-
-    this.intervalId = setTimeout(step, 20);
-  }
-
-  private executeStatement(stmt: string) {
-    const clean = stmt.trim();
-
-    // digitalWrite(pin, HIGH/LOW)
-    const dwMatch = clean.match(/digitalWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(HIGH|LOW|1|0)\s*\)/);
-    if (dwMatch) {
-      const pin = dwMatch[1];
-      const isHigh = dwMatch[2] === 'HIGH' || dwMatch[2] === '1';
-      this.updatePinState(pin, isHigh, isHigh ? 255 : 0);
-      return;
-    }
-
-    // analogWrite(pin, value)
-    const awMatch = clean.match(/analogWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(\d+)\s*\)/);
-    if (awMatch) {
-      const pin = awMatch[1];
-      const val = Math.max(0, Math.min(255, parseInt(awMatch[2], 10)));
-      this.updatePinState(pin, val > 0, val);
-      return;
-    }
-
-    // pinMode(pin, OUTPUT/INPUT/INPUT_PULLUP)
-    const pmMatch = clean.match(/pinMode\s*\(\s*([A-Za-z0-9_]+)\s*,\s*([A-Za-z0-9_]+)\s*\)/);
-    if (pmMatch) {
-      const pin = pmMatch[1];
-      const mode = pmMatch[2] as any;
-      if (this.pinStates[pin]) {
-        this.pinStates[pin].mode = mode;
-      }
-      return;
-    }
-
-    // Serial.println / Serial.print
-    const spMatch = clean.match(/Serial\.(println|print)\s*\(\s*["']?([^"')]+)["']?\s*\)/);
-    if (spMatch) {
-      const isPrintln = spMatch[1] === 'println';
-      const text = spMatch[2] + (isPrintln ? '\n' : '');
-      this.onSerialOutputCallback?.(text);
-      return;
-    }
-
-    // servo_X.write(angle)
-    const servoMatch = clean.match(/servo_([A-Za-z0-9_]+)\.write\s*\(\s*(\d+)\s*\)/);
-    if (servoMatch) {
-      const pin = servoMatch[1];
-      const angle = Math.max(0, Math.min(180, parseInt(servoMatch[2], 10)));
-      this.updatePinState(pin, true, angle);
-      return;
-    }
+    this.sketch.start(code, this.createHardware());
   }
 
   public stop() {
-    this.isRunning = false;
-    if (this.intervalId) {
-      clearTimeout(this.intervalId);
-      this.intervalId = null;
-    }
+    this.sketch.stop();
     this.initDefaultPinStates();
   }
 
