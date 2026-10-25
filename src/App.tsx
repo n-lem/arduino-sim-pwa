@@ -1,6 +1,6 @@
 /**
  * @file App.tsx
- * @description Layout orquestador principal responsivo protegido con PasswordGate y emulación AVR8js.
+ * @description Layout orquestador principal con IndexedDB, modales de exportación/importación y emulación AVR8js.
  */
 
 import { useState } from 'react';
@@ -9,75 +9,68 @@ import { NavigationTabs } from './components/layout/NavigationTabs';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { EditorContainer } from './components/editor/EditorContainer';
 import { PasswordGate } from './components/auth/PasswordGate';
+import { ExportModal } from './components/ui/ExportModal';
+import { ProjectModal } from './components/ui/ProjectModal';
 import { useCircuitStore } from './stores/useCircuitStore';
 import { useCodeStore } from './stores/useCodeStore';
 import { useSimulationLoop } from './hooks/useSimulationLoop';
+import { useAutoSave } from './hooks/useAutoSave';
 import type { ViewMode } from './types/circuit';
+import type { ArduinoProjectSchema } from './types/schema';
 
 export function App() {
   const [activeView, setActiveView] = useState<ViewMode>('circuit');
-  const { components, wires, loadCircuit } = useCircuitStore();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+
+  const { components, wires, loadCircuit, resetCircuit } = useCircuitStore();
   const { code, setCode, blocklyXml, setBlocklyXml } = useCodeStore();
   const { isRunning, toggleRun, resetSimulation } = useSimulationLoop();
+  const { isSaving } = useAutoSave();
 
-  const handleExport = () => {
-    const projectData = {
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      code,
-      blocklyXml,
-      components,
-      wires,
-    };
-    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'proyecto_arduino.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const currentProject: ArduinoProjectSchema = {
+    metadata: {
+      name: 'Circuito_Arduino',
+      author: 'Estudiante',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      schemaVersion: '1.0.0',
+    },
+    components,
+    wires,
+    code,
+    blocklyXml,
   };
 
-  const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e: any) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const data = JSON.parse(event.target?.result as string);
-            if (data.code) {
-              setCode(data.code);
-            }
-            if (data.blocklyXml) {
-              setBlocklyXml(data.blocklyXml);
-            }
-            if (data.components && data.wires) {
-              loadCircuit(data.components, data.wires);
-            }
-          } catch (err) {
-            console.error('Error al importar archivo JSON:', err);
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
+  const handleLoadProject = (project: ArduinoProjectSchema) => {
+    if (project.components && project.wires) {
+      loadCircuit(project.components, project.wires);
+    }
+    if (project.code) {
+      setCode(project.code);
+    }
+    if (project.blocklyXml) {
+      setBlocklyXml(project.blocklyXml);
+    }
+  };
+
+  const handleNewProject = () => {
+    resetCircuit();
+    setCode('// Nuevo circuito\nvoid setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}\n');
+    setBlocklyXml(null);
   };
 
   return (
     <PasswordGate>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
-        {/* 1. Header Superior Táctil con controles de simulación AVR8js */}
+        {/* 1. Header Superior Táctil */}
         <Header
           isRunning={isRunning}
           onToggleRun={toggleRun}
           onReset={resetSimulation}
-          onExport={handleExport}
-          onImport={handleImport}
+          onExport={() => setIsExportModalOpen(true)}
+          onImport={() => setIsProjectModalOpen(true)}
+          isSaving={isSaving}
         />
 
         {/* 2. Barra de Navegación por Pestañas */}
@@ -88,7 +81,6 @@ export function App() {
 
         {/* 3. Área Principal de Contenido: Responsive */}
         <main className="flex-1 relative overflow-hidden flex flex-col md:flex-row">
-          {/* En móvil muestra la pestaña seleccionada; en pantallas medianas/grandes permite split view */}
           <div className={`h-full w-full ${activeView === 'circuit' ? 'block' : 'hidden md:block md:w-1/2 md:border-r md:border-slate-800'}`}>
             <CircuitCanvas isRunning={isRunning} />
           </div>
@@ -99,6 +91,21 @@ export function App() {
             />
           </div>
         </main>
+
+        {/* 4. Modal Táctil de Exportación */}
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          project={currentProject}
+        />
+
+        {/* 5. Modal Táctil de Gestión de Proyectos */}
+        <ProjectModal
+          isOpen={isProjectModalOpen}
+          onClose={() => setIsProjectModalOpen(false)}
+          onLoadProject={handleLoadProject}
+          onNewProject={handleNewProject}
+        />
       </div>
     </PasswordGate>
   );

@@ -10,7 +10,7 @@ interface CodeStoreState {
   blocklyXml: string | null;
   isSyncedWithBlocks: boolean;
   setCode: (code: string) => void;
-  setBlocklyXml: (xml: string) => void;
+  setBlocklyXml: (xml: string | null) => void;
   setSyncedWithBlocks: (synced: boolean) => void;
 }
 

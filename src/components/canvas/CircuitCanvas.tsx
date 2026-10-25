@@ -51,6 +51,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
 
   return (
     <div
+      id="circuit-canvas-container"
       onClick={() => {
         selectComponent(null);
       }}

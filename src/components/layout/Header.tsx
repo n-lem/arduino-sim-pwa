@@ -1,10 +1,10 @@
 /**
  * @file Header.tsx
- * @description Barra superior táctil con controles principales de simulación, estado offline y guardado.
+ * @description Barra superior táctil con controles principales de simulación, estado offline y autoguardado en IndexedDB.
  */
 
 import React from 'react';
-import { Play, Square, Download, FolderOpen, WifiOff, Cpu, RefreshCw } from 'lucide-react';
+import { Play, Square, Download, FolderOpen, WifiOff, Cpu, RefreshCw, CheckCircle } from 'lucide-react';
 
 interface HeaderProps {
   isRunning: boolean;
@@ -12,6 +12,7 @@ interface HeaderProps {
   onReset: () => void;
   onExport: () => void;
   onImport: () => void;
+  isSaving?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onReset,
   onExport,
   onImport,
+  isSaving = false,
 }) => {
   return (
     <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 md:px-5 select-none shrink-0 z-30">
@@ -60,17 +62,24 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Acciones Secundarias y Estado Offline */}
+      {/* Acciones Secundarias, Autoguardado y Estado Offline */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Indicador de Autoguardado IndexedDB */}
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/60 border border-slate-700/60 text-[11px] text-slate-300 font-mono">
+          <CheckCircle className={`w-3.5 h-3.5 ${isSaving ? 'text-amber-400 animate-spin' : 'text-emerald-400'}`} />
+          <span className="hidden lg:inline">{isSaving ? 'Guardando...' : 'Guardado'}</span>
+        </div>
+
+        {/* Indicador 100% Offline */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-[11px] text-teal-400 font-mono">
           <WifiOff className="w-3.5 h-3.5 text-teal-400" />
-          <span>Offline Listo</span>
+          <span>Offline</span>
         </div>
 
         <button
           onClick={onImport}
           className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95 border border-slate-700"
-          title="Abrir Proyecto (.json)"
+          title="Abrir o Crear Proyecto"
         >
           <FolderOpen className="w-4 h-4" />
         </button>
@@ -78,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onExport}
           className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition active:scale-95 border border-slate-700"
-          title="Exportar Proyecto (.json / .ino)"
+          title="Exportar (.json / .ino / .png)"
         >
           <Download className="w-4 h-4" />
         </button>
