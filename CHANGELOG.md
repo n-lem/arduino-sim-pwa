@@ -6,6 +6,36 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [0.2.0] - 2026-10-24 - Sprint 2: Estado Global (Zustand) y UI Táctil "Tocar y Tocar"
+
+### Añadido
+- **Estado Global con Zustand (`useCircuitStore.ts`):**
+  - Gestión centralizada de componentes electrónicos (`components`), conexiones de cableado (`wires`) y estado de selección táctil activa (`selectedPin`).
+  - Funciones atómicas para agregar, eliminar, mover componentes, actualizar propiedades interactivas y resetear el circuito.
+  - Resolución inteligente y automática de colores de cable según el tipo de pin (GND en negro/pizarra, 5V/VCC en rojo, 3.3V en naranja, analógicos en verde, PWM/digitales en amarillo o azul).
+
+- **Sistema Táctil "Tocar y Tocar" (Touch Wiring):**
+  - Eliminación de la necesidad de arrastre (*drag-and-drop*) para cablear:
+    1. El usuario toca el pin de origen: se resalta con halo amarillo pulsante y se muestra banner de guía superior.
+    2. El usuario toca el pin de destino: se valida y traza automáticamente el cable Bézier.
+    3. Si se toca el mismo pin nuevamente, la selección se cancela sin efectos colaterales.
+  - Feedback háptico opcional mediante `navigator.vibrate` para dispositivos móviles compatibles.
+  - Hitbox táctil agrandado invisible en cada pin (radio ampliado a 8-10px) para máxima precisión en pantallas capacitivas y touchpads de netbooks.
+
+- **Componentes Electrónicos SVG Vectoriales Interactivos (`src/components/parts/`):**
+  - **`ArduinoUnoPart.tsx`:** Placa Arduino Uno R3 realista en SVG con ATmega328P, pines digitales D0-D13, analógicos A0-A5, de alimentación (5V, 3.3V, GND, VIN, RESET, AREF) y LEDs integrados (L y ON).
+  - **`LedPart.tsx`:** Diodo LED de 5mm con ánodo (+), cátodo (-), efecto de halo lumínico pulsante y color dinámico.
+  - **`ResistorPart.tsx`:** Resistencia pasiva con código de colores según el valor en Ohms y terminales táctiles axiales.
+  - **`PushbuttonPart.tsx`:** Pulsador táctil con botón interactivo (presionar/soltar) para entradas digitales.
+  - **`ServoPart.tsx`:** Servomotor SG90 con carcasa azul, 3 pines táctiles (GND, 5V, PWM) y rotor/brazo móvil orientado según el ángulo configurado.
+  - **`UltrasonicPart.tsx`:** Sensor ultrasónico HC-SR04 con transductores metálicos emisor (T) y receptor (R), 4 pines táctiles y control deslizante para simular distancia de obstáculos.
+
+- **Capa de Cables SVG con Curvas de Bézier (`WireLayer.tsx`):**
+  - Trazado suave y natural con curvatura física simulando cables de protoboard con filtro de sombra y brillo.
+  - Eliminación táctil de cables al tocarlos o hacer clic sobre su trayectoria con hitbox ensanchado.
+
+---
+
 ## [0.1.0] - 2026-10-24 - Sprint 1: Setup Inicial, PWA Offline y Layout Responsivo
 
 ### Añadido
