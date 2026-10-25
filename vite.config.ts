@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/arduino-sim-pwa/',
   plugins: [
     react(),
     VitePWA({
@@ -16,6 +17,7 @@ export default defineConfig({
         background_color: '#0F172A',
         display: 'standalone',
         orientation: 'any',
+        start_url: '/arduino-sim-pwa/',
         icons: [
           {
             src: 'favicon.svg',

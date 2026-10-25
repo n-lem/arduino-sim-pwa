@@ -6,6 +6,36 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [0.4.0] - 2026-10-24 - Sprint 4: Emulación AVR8js en Tiempo Real, PasswordGate y Despliegue en GitHub Pages
+
+### Añadido
+- **Emulador ATmega328P con AVR8js (`avrRunner.ts`):**
+  - Motor de simulación del microcontrolador ATmega328P de 16 MHz emulado en JavaScript / WebAssembly.
+  - Mapeo completo de registros de puertos I/O:
+    - **Port B (PB0 a PB5):** Pines digitales 8 al 13 (incluyendo pin 13 / LED L integrado).
+    - **Port D (PD0 a PD7):** Pines digitales 0 al 7 (TX, RX y salidas PWM).
+    - **Port C (PC0 a PC5):** Pines analógicos A0 al A5.
+  - Temporizadores de hardware integrados (`timer0Config`, `timer1Config`, `timer2Config`) para PWM y delays.
+  - Módulo USART (`AVRUSART`) a 9600 baudios para emisión y recepción de datos por el puerto serie.
+
+- **Conexión Reactiva Circuito-Emulador (`useSimulationLoop.ts` y `useSimulationStore.ts`):**
+  - Escucha de cambios de estado en los pines digitales de Arduino y propagación a los componentes conectados en el lienzo:
+    - Los LEDs conectados al pin 13 o pines digitales se encienden (`isOn: true`) cuando el microcontrolador escribe `HIGH` y se apagan en `LOW`.
+    - Los servomotores SG90 orientan su rotor visual en grados (0° a 180°) según el valor recibido por el pin PWM.
+    - Soporte para inyección de entradas digitales externas (pulsadores).
+  - Terminal de salida en tiempo real en la pestaña **Monitor Serial** con soporte para saltos de línea y botón de limpieza de consola.
+
+- **Protección de Acceso con Contraseña (`PasswordGate.tsx`):**
+  - Barrera de seguridad para acceso restringido a estudiantes y docentes.
+  - Contraseña predeterminada: `arduino2026`.
+  - Opción "Recordar en este celular / netbook" para persistir la sesión localmente en `localStorage` y evitar pedir la clave reiteradamente en el aula offline.
+
+- **Despliegue Continuo a GitHub Pages (`.github/workflows/deploy.yml`):**
+  - Configuración de base path `/arduino-sim-pwa/` en `vite.config.ts`.
+  - Automatización mediante GitHub Actions para compilar y publicar en **GitHub Pages** en cada push a la rama `main`.
+
+---
+
 ## [0.3.0] - 2026-10-24 - Sprint 3: Integración de Google Blockly y CodeMirror (Sincronización en Tiempo Real)
 
 ### Añadido
