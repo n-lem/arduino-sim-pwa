@@ -48,7 +48,7 @@ ${loopCode || '  // Bucle principal\n'}
 
   // 5. Delay
   javascriptGenerator.forBlock['arduino_delay'] = function (block) {
-    const ms = javascriptGenerator.valueToCode(block, 'MS', Order.ATOMIC) || '1000';
+    const ms = javascriptGenerator.valueToCode(block, 'MS', Order.ATOMIC) || '0';
     return `  delay(${ms});\n`;
   };
 

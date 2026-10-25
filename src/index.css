@@ -14,10 +14,20 @@
     margin: 0;
     padding: 0;
     overscroll-behavior: none;
+    background-color: #020617;
   }
 }
 
-/* Scrollbar estilizada y discreta para paneles de código y catálogo */
+/* Ocultar barra de scroll en contenedores horizontales */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Scrollbar estilizada y discreta */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -31,4 +41,45 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
+}
+
+/* Ajustes Aesthetic de Google Blockly en Modo Oscuro */
+.blocklyMainBackground {
+  stroke-width: 0 !important;
+}
+
+.blocklyToolboxDiv {
+  background-color: #0b132b !important;
+  border-right: 1px solid #1e293b !important;
+  color: #cbd5e1 !important;
+  padding: 6px 4px !important;
+}
+
+.blocklyTreeRow {
+  height: 32px !important;
+  line-height: 32px !important;
+  padding-left: 8px !important;
+  border-radius: 8px !important;
+  margin-bottom: 2px !important;
+  transition: all 0.15s ease !important;
+}
+
+.blocklyTreeRow:hover {
+  background-color: #1e293b !important;
+}
+
+.blocklyTreeSelected {
+  background-color: #1e293b !important;
+}
+
+.blocklyTreeLabel {
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #e2e8f0 !important;
+}
+
+.blocklyFlyoutBackground {
+  fill: #0f172a !important;
+  fill-opacity: 0.96 !important;
 }

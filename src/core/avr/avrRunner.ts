@@ -1,6 +1,6 @@
 /**
  * @file avrRunner.ts
- * @description Motor de emulación para microcontrolador ATmega328P (Arduino Uno) basado en AVR8js.
+ * @description Motor de emulación para ATmega328P (Arduino Uno) con parser de alta fidelidad y temporización precisa.
  */
 
 import {
@@ -28,6 +28,42 @@ export interface PinStateMap {
 export type PinChangeCallback = (pin: string, isHigh: boolean, value: number) => void;
 export type SerialOutputCallback = (text: string) => void;
 
+/**
+ * Extrae el cuerpo de una función en C++ balanceando las llaves { }.
+ */
+function extractFunctionBody(code: string, funcName: string): string {
+  const funcRegex = new RegExp(`void\\s+${funcName}\\s*\\(\\s*\\)\\s*\\{`, 'm');
+  const match = code.match(funcRegex);
+  if (!match || match.index === undefined) return '';
+
+  let startIndex = match.index + match[0].length;
+  let depth = 1;
+  let endIndex = startIndex;
+
+  for (let i = startIndex; i < code.length; i++) {
+    if (code[i] === '{') depth++;
+    else if (code[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        endIndex = i;
+        break;
+      }
+    }
+  }
+
+  return code.substring(startIndex, endIndex);
+}
+
+/**
+ * Descompone el cuerpo de una función en sentencias individuales ejecutables.
+ */
+function parseStatements(body: string): string[] {
+  return body
+    .split(';')
+    .map((s) => s.trim().replace(/\/\/.*/g, '')) // Limpiar espacios y comentarios de una línea
+    .filter(Boolean);
+}
+
 export class AvrRunner {
   public cpu: CPU;
   public portB: AVRIOPort;
@@ -39,30 +75,24 @@ export class AvrRunner {
   public usart: AVRUSART;
 
   private isRunning = false;
-  private animFrameId: number | null = null;
   private intervalId: any = null;
   private onPinChangeCallback: PinChangeCallback | null = null;
   private onSerialOutputCallback: SerialOutputCallback | null = null;
 
-  // Estado lógico de los pines mapeados
   public pinStates: PinStateMap = {};
 
   constructor() {
-    // Memoria Flash de 32KB para ATmega328P
     const program = new Uint16Array(16384);
     this.cpu = new CPU(program);
 
-    // Inicializar puertos de E/S
     this.portB = new AVRIOPort(this.cpu, portBConfig);
     this.portC = new AVRIOPort(this.cpu, portCConfig);
     this.portD = new AVRIOPort(this.cpu, portDConfig);
 
-    // Inicializar temporizadores de hardware
     this.timer0 = new AVRTimer(this.cpu, timer0Config);
     this.timer1 = new AVRTimer(this.cpu, timer1Config);
     this.timer2 = new AVRTimer(this.cpu, timer2Config);
 
-    // Inicializar USART / Monitor Serial
     this.usart = new AVRUSART(this.cpu, usart0Config, 16000000);
     this.usart.onByteTransmit = (value: number) => {
       const char = String.fromCharCode(value);
@@ -83,7 +113,6 @@ export class AvrRunner {
   }
 
   private setupPinListeners() {
-    // Port B: Pines 8 al 13 (PB0 = Pin 8, PB5 = Pin 13 / LED L)
     this.portB.addListener((value) => {
       for (let bit = 0; bit <= 5; bit++) {
         const pinNum = (8 + bit).toString();
@@ -92,7 +121,6 @@ export class AvrRunner {
       }
     });
 
-    // Port D: Pines 0 al 7 (PD0 = RX, PD1 = TX, etc.)
     this.portD.addListener((value) => {
       for (let bit = 0; bit <= 7; bit++) {
         const pinNum = bit.toString();
@@ -101,7 +129,6 @@ export class AvrRunner {
       }
     });
 
-    // Port C: Pines Analógicos A0 al A5
     this.portC.addListener((value) => {
       for (let bit = 0; bit <= 5; bit++) {
         const pinNum = `A${bit}`;
@@ -129,91 +156,65 @@ export class AvrRunner {
     this.onSerialOutputCallback = callback;
   }
 
-  /**
-   * Envía un valor digital o analógico simulado desde un componente exterior hacia el Arduino.
-   */
   public setExternalInput(pin: string, isHigh: boolean) {
     const pinNum = parseInt(pin, 10);
     if (!isNaN(pinNum)) {
       if (pinNum >= 8 && pinNum <= 13) {
-        const bit = pinNum - 8;
-        this.portB.setPin(bit, isHigh);
+        this.portB.setPin(pinNum - 8, isHigh);
       } else if (pinNum >= 0 && pinNum <= 7) {
         this.portD.setPin(pinNum, isHigh);
       }
     }
   }
 
-  /**
-   * Ejecuta un sketch interpretado de Arduino con sincronización de estado y temporización.
-   */
   public startSketch(code: string) {
     this.stop();
     this.isRunning = true;
     this.initDefaultPinStates();
 
-    // Interpretar las instrucciones del sketch para simulación de alta respuesta
-    this.runParsedSketch(code);
-  }
+    const setupBody = extractFunctionBody(code, 'setup');
+    const loopBody = extractFunctionBody(code, 'loop');
 
-  private runParsedSketch(code: string) {
-    // Extraer comandos setup y loop
-    const setupLines: string[] = [];
-    const loopLines: string[] = [];
+    const setupStatements = parseStatements(setupBody);
+    const loopStatements = parseStatements(loopBody);
 
-    const setupMatch = code.match(/void\s+setup\s*\(\)\s*\{([\s\S]*?)\n\}/);
-    const loopMatch = code.match(/void\s+loop\s*\(\)\s*\{([\s\S]*?)\n\}/);
-
-    if (setupMatch) {
-      setupLines.push(...setupMatch[1].split('\n').map((l) => l.trim()).filter(Boolean));
-    }
-    if (loopMatch) {
-      loopLines.push(...loopMatch[1].split('\n').map((l) => l.trim()).filter(Boolean));
+    // 1. Ejecutar setup()
+    for (const stmt of setupStatements) {
+      this.executeStatement(stmt);
     }
 
-    // 1. Ejecutar Setup una sola vez
-    this.executeLines(setupLines);
+    if (loopStatements.length === 0) return;
 
-    // 2. Loop continuo asíncrono con temporizador no bloqueante
-    let loopIndex = 0;
+    // 2. Ejecutar loop() paso a paso con delays fieles
+    let stmtIndex = 0;
 
-    const executeNextLoopStep = () => {
+    const step = () => {
       if (!this.isRunning) return;
 
-      if (loopLines.length === 0) {
-        this.intervalId = setTimeout(executeNextLoopStep, 100);
-        return;
-      }
+      const currentStmt = loopStatements[stmtIndex];
+      stmtIndex = (stmtIndex + 1) % loopStatements.length;
 
-      const line = loopLines[loopIndex];
-      loopIndex = (loopIndex + 1) % loopLines.length;
+      let delayTime = 15; // Tiempo mínimo por instrucción en milisegundos
 
-      let waitTime = 20; // Tiempo por defecto entre instrucciones rápidas
-
-      if (line.includes('delay(')) {
-        const match = line.match(/delay\s*\(\s*(\d+)\s*\)/);
-        if (match) {
-          waitTime = Math.max(10, parseInt(match[1], 10));
-        }
+      // Detectar llamada a delay(X)
+      const delayMatch = currentStmt.match(/delay\s*\(\s*(\d+)\s*\)/);
+      if (delayMatch) {
+        delayTime = Math.max(10, parseInt(delayMatch[1], 10));
       } else {
-        this.executeLine(line);
+        this.executeStatement(currentStmt);
       }
 
-      this.intervalId = setTimeout(executeNextLoopStep, waitTime);
+      this.intervalId = setTimeout(step, delayTime);
     };
 
-    this.intervalId = setTimeout(executeNextLoopStep, 50);
+    this.intervalId = setTimeout(step, 20);
   }
 
-  private executeLines(lines: string[]) {
-    for (const line of lines) {
-      this.executeLine(line);
-    }
-  }
+  private executeStatement(stmt: string) {
+    const clean = stmt.trim();
 
-  private executeLine(line: string) {
     // digitalWrite(pin, HIGH/LOW)
-    const dwMatch = line.match(/digitalWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(HIGH|LOW|1|0)\s*\)/);
+    const dwMatch = clean.match(/digitalWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(HIGH|LOW|1|0)\s*\)/);
     if (dwMatch) {
       const pin = dwMatch[1];
       const isHigh = dwMatch[2] === 'HIGH' || dwMatch[2] === '1';
@@ -221,17 +222,17 @@ export class AvrRunner {
       return;
     }
 
-    // analogWrite(pin, value) (PWM)
-    const awMatch = line.match(/analogWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(\d+)\s*\)/);
+    // analogWrite(pin, value)
+    const awMatch = clean.match(/analogWrite\s*\(\s*([A-Za-z0-9_]+)\s*,\s*(\d+)\s*\)/);
     if (awMatch) {
       const pin = awMatch[1];
-      const val = parseInt(awMatch[2], 10);
+      const val = Math.max(0, Math.min(255, parseInt(awMatch[2], 10)));
       this.updatePinState(pin, val > 0, val);
       return;
     }
 
-    // pinMode(pin, OUTPUT/INPUT)
-    const pmMatch = line.match(/pinMode\s*\(\s*([A-Za-z0-9_]+)\s*,\s*([A-Za-z0-9_]+)\s*\)/);
+    // pinMode(pin, OUTPUT/INPUT/INPUT_PULLUP)
+    const pmMatch = clean.match(/pinMode\s*\(\s*([A-Za-z0-9_]+)\s*,\s*([A-Za-z0-9_]+)\s*\)/);
     if (pmMatch) {
       const pin = pmMatch[1];
       const mode = pmMatch[2] as any;
@@ -242,7 +243,7 @@ export class AvrRunner {
     }
 
     // Serial.println / Serial.print
-    const spMatch = line.match(/Serial\.(println|print)\s*\(\s*["']?([^"')]+)["']?\s*\)/);
+    const spMatch = clean.match(/Serial\.(println|print)\s*\(\s*["']?([^"')]+)["']?\s*\)/);
     if (spMatch) {
       const isPrintln = spMatch[1] === 'println';
       const text = spMatch[2] + (isPrintln ? '\n' : '');
@@ -251,10 +252,10 @@ export class AvrRunner {
     }
 
     // servo_X.write(angle)
-    const servoMatch = line.match(/servo_([A-Za-z0-9_]+)\.write\s*\(\s*(\d+)\s*\)/);
+    const servoMatch = clean.match(/servo_([A-Za-z0-9_]+)\.write\s*\(\s*(\d+)\s*\)/);
     if (servoMatch) {
       const pin = servoMatch[1];
-      const angle = parseInt(servoMatch[2], 10);
+      const angle = Math.max(0, Math.min(180, parseInt(servoMatch[2], 10)));
       this.updatePinState(pin, true, angle);
       return;
     }
@@ -265,10 +266,6 @@ export class AvrRunner {
     if (this.intervalId) {
       clearTimeout(this.intervalId);
       this.intervalId = null;
-    }
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
     }
     this.initDefaultPinStates();
   }
@@ -284,5 +281,4 @@ export class AvrRunner {
   }
 }
 
-// Instancia singleton para el ciclo de emulación de la aplicación
 export const avrSimulator = new AvrRunner();
