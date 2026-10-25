@@ -12,13 +12,26 @@ import { useCircuitStore } from '../stores/useCircuitStore';
 import { useSimulationStore } from '../stores/useSimulationStore';
 import { useCodeStore } from '../stores/useCodeStore';
 
-/** Umbral lógico de entrada de un ATmega328P alimentado a 5 V. */
-const LOGIC_HIGH_VOLTS = 2.5;
+import { activeProfile } from '../core/boards';
+import { playTone, stopTone, unlockAudio } from '../core/audio';
+
+/** Fracción de la tensión lógica a partir de la cual una entrada se lee como HIGH. */
+const LOGIC_HIGH_FRACTION = 0.5;
 
 export function useSimulationLoop() {
-  const { isRunning, setIsRunning, addSerialLog, setWarnings, setMeasurements } = useSimulationStore();
+  const { isRunning, setIsRunning, addSerialLog, setWarnings, setMeasurements, setToneFreq } = useSimulationStore();
   const { components, wires, updateComponentProperty } = useCircuitStore();
   const { code } = useCodeStore();
+  const buzzerOn = useSimulationStore((s) => s.buzzerOn);
+  const toneFreq = useSimulationStore((s) => s.toneFreq);
+
+  // Sonido: el buzzer suena con tone() si lo hay o, si no, con un tono fijo de buzzer activo.
+  useEffect(() => {
+    const anyOn = Object.values(buzzerOn).some(Boolean);
+    if (isRunning && anyOn) playTone(toneFreq > 0 ? toneFreq : 2000);
+    else stopTone();
+    return () => stopTone();
+  }, [isRunning, buzzerOn, toneFreq]);
 
   const componentsRef = useRef(components);
   const wiresRef = useRef(wires);
@@ -31,6 +44,7 @@ export function useSimulationLoop() {
   /** Resuelve el circuito y propaga el resultado a los componentes y al microcontrolador. */
   const evaluatePhysics = () => {
     const current = componentsRef.current;
+    const profile = activeProfile(current);
     const result = solveCircuitPhysics(current, wiresRef.current, avrSimulator.pinStates);
 
     const setIfChanged = (id: string, prop: string, value: unknown) => {
@@ -52,8 +66,8 @@ export function useSimulationLoop() {
     for (const [pin, state] of Object.entries(avrSimulator.pinStates)) {
       if (state.mode === 'OUTPUT') continue;
       const volts = result.pinVoltages[pin] ?? 0;
-      avrSimulator.setExternalInput(pin, volts >= LOGIC_HIGH_VOLTS);
-      avrSimulator.setAnalogInput(pin, (volts / 5) * 1023);
+      avrSimulator.setExternalInput(pin, volts >= profile.logicVolts * LOGIC_HIGH_FRACTION);
+      avrSimulator.setAnalogInput(pin, (volts / profile.logicVolts) * profile.adcMax);
     }
     for (const [pin, micros] of Object.entries(result.pulseMicros)) avrSimulator.setPulseInput(pin, micros);
 
@@ -68,7 +82,13 @@ export function useSimulationLoop() {
       setIsRunning(false);
     });
     avrSimulator.setPinListener(() => evaluatePhysics());
-  }, [addSerialLog, updateComponentProperty, setIsRunning]);
+    let toneTimer: ReturnType<typeof setTimeout> | undefined;
+    avrSimulator.setToneListener((_pin, freq, durationMs) => {
+      clearTimeout(toneTimer);
+      setToneFreq(freq);
+      if (freq > 0 && durationMs > 0) toneTimer = setTimeout(() => setToneFreq(0), durationMs);
+    });
+  }, [addSerialLog, updateComponentProperty, setIsRunning, setToneFreq]);
 
   // Si el usuario cambia cables o componentes (p. ej. presiona un pulsador) mientras corre, re-evaluar.
   useEffect(() => {
@@ -85,6 +105,7 @@ export function useSimulationLoop() {
         burned.includes(c) ? { ...c, properties: { ...c.properties, burned: false } } : c
       );
       avrSimulator.clearExternalInputs();
+      avrSimulator.setBoard(activeProfile(componentsRef.current));
       avrSimulator.startSketch(code);
       evaluatePhysics();
     } else {
@@ -105,7 +126,10 @@ export function useSimulationLoop() {
 
   return {
     isRunning,
-    toggleRun: () => setIsRunning(!isRunning),
+    toggleRun: () => {
+      if (!isRunning) unlockAudio();
+      setIsRunning(!isRunning);
+    },
     resetSimulation: () => {
       setIsRunning(false);
       avrSimulator.reset();

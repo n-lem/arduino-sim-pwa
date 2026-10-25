@@ -8,6 +8,7 @@ import type { ViewMode } from '../../types/circuit';
 import { BlocklyWorkspace } from './BlocklyWorkspace';
 import { CodeMirrorEditor } from './CodeMirrorEditor';
 import { useSimulationStore } from '../../stores/useSimulationStore';
+import { avrSimulator } from '../../core/avr/avrRunner';
 import { Terminal, Trash2 } from 'lucide-react';
 
 interface EditorContainerProps {
@@ -15,7 +16,8 @@ interface EditorContainerProps {
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({ activeView }) => {
-  const { serialLogs, clearSerialLogs } = useSimulationStore();
+  const { serialLogs, clearSerialLogs, addSerialLog, isRunning } = useSimulationStore();
+  const [serialInput, setSerialInput] = React.useState('');
   const serialEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,15 +67,38 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({ activeView }) 
           </div>
         </div>
 
-        {/* Consola de Logs */}
-        <div className="flex-1 overflow-y-auto space-y-1 font-mono text-xs leading-relaxed">
-          {serialLogs.map((log, index) => (
-            <div key={index} className="text-emerald-300 whitespace-pre-wrap break-all">
-              {log}
-            </div>
-          ))}
+        {/* Consola de Logs: texto continuo, así print() sin salto de línea queda en la misma línea */}
+        <div className="flex-1 overflow-y-auto font-mono text-xs leading-relaxed">
+          <pre className="text-emerald-300 whitespace-pre-wrap break-all font-mono">{serialLogs.join('')}</pre>
           <div ref={serialEndRef} />
         </div>
+
+        {/* Entrada: lo escrito llega al sketch por Serial.read()/available() */}
+        <form
+          className="flex gap-2 pt-2 mt-2 border-t border-slate-800 shrink-0"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!serialInput) return;
+            avrSimulator.pushSerialInput(serialInput + '\n');
+            addSerialLog(`> ${serialInput}\n`);
+            setSerialInput('');
+          }}
+        >
+          <input
+            value={serialInput}
+            onChange={(e) => setSerialInput(e.target.value)}
+            placeholder={isRunning ? 'Escribí un mensaje para el programa…' : 'Iniciá la simulación para enviar datos'}
+            disabled={!isRunning}
+            className="flex-1 bg-slate-900 border border-slate-700 focus:border-teal-400 outline-none rounded-lg px-3 py-2 text-slate-100 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!isRunning || !serialInput}
+            className="px-4 py-2 rounded-lg bg-arduino-teal text-white text-xs font-semibold disabled:opacity-40"
+          >
+            Enviar
+          </button>
+        </form>
       </div>
     );
   }

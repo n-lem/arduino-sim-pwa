@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Trash2, X } from 'lucide-react';
+import { isBoardType } from '../../core/boards';
 import type { CircuitComponent } from '../../types/circuit';
 import { useSimulationStore } from '../../stores/useSimulationStore';
 import {
@@ -72,7 +73,7 @@ const CommitInput: React.FC<{
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ component, onChange, onDelete, onClose }) => {
   const measurement = useSimulationStore((s) => s.measurements[component.id]);
   const props = component.properties;
-  const isArduino = component.type === 'arduino-uno';
+  const isBoard = isBoardType(component.type);
 
   return (
     <div
@@ -87,15 +88,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ component, onC
             {measurement.volts.toFixed(2)} V · {formatCurrent(measurement.milliamps)}
           </span>
         )}
-        {!isArduino && (
-          <button
-            onClick={onDelete}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium active:scale-95"
-            title="Eliminar componente (Supr)"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> Eliminar
-          </button>
-        )}
+        <button
+          onClick={onDelete}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium active:scale-95"
+          title="Eliminar componente (Supr)"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+        </button>
         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400" title="Cerrar">
           <X className="w-4 h-4" />
         </button>
@@ -220,10 +219,40 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ component, onC
         )}
 
         {component.type === 'buzzer' && (
-          <p className="text-xs text-slate-400">Suena cuando recibe 2 V o más entre + y −.</p>
+          <p className="text-xs text-slate-400">Suena con 2 V o más entre + y −. Con tone(pin, Hz) reproduce esa nota (activá el sonido del dispositivo).</p>
         )}
 
-        {isArduino && <p className="text-xs text-slate-400">La placa no se puede eliminar. Tocá un pin para empezar un cable.</p>}
+        {isBoard && (
+          <p className="text-xs text-slate-400">
+            Placa con lógica de {component.type === 'esp32' ? '3,3 V y ADC de 12 bits (0–4095)' : '5 V y ADC de 10 bits (0–1023)'}.
+            Podés eliminarla y armar circuitos solo con batería. Tocá un pin para empezar un cable.
+          </p>
+        )}
+
+        {component.type === 'switch' && (
+          <button className={chipClass(Boolean(props.closed))} onClick={() => onChange('closed', !props.closed)}>
+            {props.closed ? 'Cerrado (conduce) — tocá para abrir' : 'Abierto — tocá para cerrar'}
+          </button>
+        )}
+
+        {component.type === 'ldr' && (
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            Luz
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Number(props.light) || 0}
+              onChange={(e) => onChange('light', Number(e.target.value))}
+              className="flex-1 accent-amber-400"
+            />
+            <span className="w-10 text-right text-slate-200 font-mono">{Number(props.light) || 0}%</span>
+          </label>
+        )}
+
+        {component.type === 'multimeter' && (
+          <p className="text-xs text-slate-400">Voltímetro: conectá V+ y COM a dos puntos del circuito con la simulación en marcha.</p>
+        )}
       </div>
     </div>
   );

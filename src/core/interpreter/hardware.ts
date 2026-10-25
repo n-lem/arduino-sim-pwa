@@ -9,6 +9,8 @@ export type Signal = { type: 'delay'; ms: number } | { type: 'yield' };
 
 /** Operaciones de hardware disponibles para un sketch. Los pines son numéricos (A0 = 14). */
 export interface Hardware {
+  /** Constantes propias de la placa (p. ej. LED_BUILTIN). */
+  constants?: Record<string, number>;
   pinMode(pin: number, mode: number): void;
   digitalWrite(pin: number, value: number): void;
   digitalRead(pin: number): number;

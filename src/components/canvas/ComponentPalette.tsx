@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Plus, X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu } from 'lucide-react';
+import { Plus, X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu, Sun, ToggleLeft } from 'lucide-react';
 import type { ComponentType } from '../../types/circuit';
 
 interface ComponentPaletteProps {
@@ -25,6 +25,13 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   {
+    title: 'Placas (reemplazan a la actual)',
+    items: [
+      { type: 'arduino-uno', label: 'Arduino Uno', hint: '5 V · 14 pines digitales · 6 analógicos', icon: Cpu },
+      { type: 'esp32', label: 'ESP32', hint: '3,3 V · GPIO · ADC de 12 bits', icon: Cpu },
+    ],
+  },
+  {
     title: 'Fuentes de energía',
     items: [{ type: 'battery', label: 'Batería', hint: 'Pila o batería de 1,5 a 12 V', icon: Battery }],
   },
@@ -33,11 +40,15 @@ const CATEGORIES: Category[] = [
     items: [
       { type: 'resistor', label: 'Resistencia', hint: 'Valor editable (ley de Ohm)', icon: Cpu },
       { type: 'potentiometer', label: 'Potenciómetro', hint: 'Divisor de tensión variable', icon: Sliders },
+      { type: 'ldr', label: 'Fotorresistencia (LDR)', hint: 'Resistencia según la luz', icon: Sun },
     ],
   },
   {
     title: 'Entradas',
-    items: [{ type: 'pushbutton', label: 'Pulsador', hint: 'Cierra el circuito al apretarlo', icon: CircleDot }],
+    items: [
+      { type: 'pushbutton', label: 'Pulsador', hint: 'Cierra el circuito al apretarlo', icon: CircleDot },
+      { type: 'switch', label: 'Interruptor', hint: 'Queda abierto o cerrado', icon: ToggleLeft },
+    ],
   },
   {
     title: 'Salidas',
@@ -46,6 +57,10 @@ const CATEGORIES: Category[] = [
       { type: 'buzzer', label: 'Buzzer', hint: 'Suena con 2 V o más', icon: Volume2 },
       { type: 'servo-sg90', label: 'Servo SG90', hint: 'Motor de posición 0–180°', icon: Gauge },
     ],
+  },
+  {
+    title: 'Instrumentos',
+    items: [{ type: 'multimeter', label: 'Multímetro', hint: 'Mide tensión entre dos puntos', icon: Gauge }],
   },
   {
     title: 'Sensores',

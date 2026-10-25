@@ -65,6 +65,42 @@ describe('baterías y ley de Ohm (sin Arduino)', () => {
   });
 });
 
+describe('ESP32, interruptor, LDR y multímetro', () => {
+  const bat = (v: number) => { const b = createComponentFactory('battery', 'b'); b.properties.voltage = v; return b; };
+
+  it('ESP32 en HIGH enciende un LED con resistencia (3,3 V)', () => {
+    const e = createComponentFactory('esp32', 'e'); const rr = res(); rr.properties.resistance = 100; const l = led();
+    const p = pins(); p['2'] =     { isHigh: true, value: 255, mode: 'OUTPUT' };
+    const r = solveCircuitPhysics([e, rr, l], [wire(e.id, 'd2', rr.id, 'pin1'), wire(rr.id, 'pin2', l.id, 'anode'), wire(l.id, 'cathode', e.id, 'gnd1')], p);
+    expect(r.ledStates[l.id]).toBe(true);
+  });
+
+  it('interruptor abierto corta y cerrado conduce', () => {
+    const b = bat(9); const s = createComponentFactory('switch', 's'); const rr = res(); rr.properties.resistance = 1000;
+    const ws = [wire(b.id, 'pos', s.id, 'pin1'), wire(s.id, 'pin2', rr.id, 'pin1'), wire(rr.id, 'pin2', b.id, 'neg')];
+    s.properties.closed = false;
+    expect(solveCircuitPhysics([b, s, rr], ws, pins()).measurements[rr.id].milliamps).toBeCloseTo(0, 1);
+    s.properties.closed = true;
+    expect(solveCircuitPhysics([b, s, rr], ws, pins()).measurements[rr.id].milliamps).toBeCloseTo(9, 0);
+  });
+
+  it('LDR: más luz, más corriente', () => {
+    const b = bat(5); const x = createComponentFactory('ldr', 'x');
+    const ws = [wire(b.id, 'pos', x.id, 'pin1'), wire(x.id, 'pin2', b.id, 'neg')];
+    x.properties.light = 10;
+    const dark = solveCircuitPhysics([b, x], ws, pins()).measurements[x.id].milliamps;
+    x.properties.light = 90;
+    const bright = solveCircuitPhysics([b, x], ws, pins()).measurements[x.id].milliamps;
+    expect(bright).toBeGreaterThan(dark);
+  });
+
+  it('multímetro mide la tensión de la batería', () => {
+    const b = bat(9); const m = createComponentFactory('multimeter', 'm');
+    const r = solveCircuitPhysics([b, m], [wire(b.id, 'pos', m.id, 'red'), wire(m.id, 'black', b.id, 'neg')], pins());
+    expect(r.measurements[m.id].volts).toBeCloseTo(9, 1);
+  });
+});
+
 describe('circuitSolver', () => {
   it('LED directo entre 5V y GND se quema', () => {
     const l = led();

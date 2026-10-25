@@ -10,6 +10,7 @@
 
 import type { CircuitComponent, WireConnection } from '../../types/circuit';
 import type { PinStateMap } from '../avr/avrRunner';
+import { BOARD_PROFILES, findBoard, type BoardProfile } from '../boards';
 
 /** Resultado de resolver el circuito para un estado dado de los pines del Arduino. */
 export interface SolveResult {
@@ -41,13 +42,13 @@ const LED_BURN_MA = 40;
 const PIN_RS = 25;
 const PIN_PULLUP_R = 30000;
 const PIN_MAX_MA = 40;
-const RAIL_5V_RS = 0.5;
 const RAIL_5V_MAX_MA = 500;
 const SERVO_LOAD = 200;
 const SENSOR_LOAD = 330;
 const BATTERY_RI = 0.1;
 const BATTERY_MAX_MA = 1000;
 const BUZZER_LOAD = 100;
+const MULTIMETER_R = 1e7;
 const BUZZER_MIN_V = 2;
 const MIN_R = 0.01;
 const US_PER_CM = 58.2;
@@ -98,8 +99,6 @@ interface Res { a: number; b: number; g: number }
 interface Src { n: number; v: number; rs: number; label: string; kind: 'pin' | '5v' | '3v3' }
 interface Led { id: string; a: number; k: number; vf: number; on: boolean }
 
-const DIGITAL_PINS = Array.from({ length: 14 }, (_, i) => ({ id: `d${i}`, key: String(i) }));
-const ANALOG_PINS = Array.from({ length: 6 }, (_, i) => ({ id: `a${i}`, key: `A${i}` }));
 
 /**
  * Resuelve el circuito completo.
@@ -112,9 +111,10 @@ export function solveCircuitPhysics(
   wires: WireConnection[],
   pinStates: PinStateMap
 ): SolveResult {
-  const arduino = components.find((c) => c.type === 'arduino-uno');
+  const board = findBoard(components);
+  const arduino = board?.comp;
   const firstBattery = components.find((c) => c.type === 'battery');
-  if (!arduino && !firstBattery) {
+  if (!board && !firstBattery) {
     return {
       ledStates: {}, ledCurrents: {}, burnedLeds: [], servoAngles: {}, servoPowered: {},
       pinVoltages: {}, pulseMicros: {}, measurements: {}, buzzerOn: {}, warnings: [],
@@ -122,12 +122,12 @@ export function solveCircuitPhysics(
   }
 
   const preBurned = new Set(components.filter((c) => c.type === 'led' && c.properties.burned).map((c) => c.id));
-  const first = runSolve(components, wires, pinStates, arduino, preBurned);
+  const first = runSolve(components, wires, pinStates, arduino, board?.profile ?? BOARD_PROFILES['arduino-uno'], preBurned);
   if (first.newlyBurned.length === 0) return first.result;
 
   // Un LED se quemó: se vuelve a resolver como circuito abierto para reflejar el estado real.
   const burned = new Set([...preBurned, ...first.newlyBurned]);
-  return runSolve(components, wires, pinStates, arduino, burned).result;
+  return runSolve(components, wires, pinStates, arduino, board?.profile ?? BOARD_PROFILES['arduino-uno'], burned).result;
 }
 
 function runSolve(
@@ -135,6 +135,7 @@ function runSolve(
   wires: WireConnection[],
   pinStates: PinStateMap,
   arduino: CircuitComponent | undefined,
+  profile: BoardProfile,
   burned: Set<string>
 ): { result: SolveResult; newlyBurned: string[] } {
   const k = (c: string, p: string) => `${c}:${p}`;
@@ -142,11 +143,10 @@ function runSolve(
   for (const w of wires) uf.union(k(w.fromComponentId, w.fromPinId), k(w.toComponentId, w.toPinId));
   // Referencia de 0 V: GND del Arduino o, si no hay placa, el negativo de la primera batería.
   if (arduino) {
-    uf.union(k(arduino.id, 'gnd1'), k(arduino.id, 'gnd2'));
-    uf.union(k(arduino.id, 'gnd1'), k(arduino.id, 'gnd3'));
+    for (const g of profile.grounds.slice(1)) uf.union(k(arduino.id, profile.grounds[0]), k(arduino.id, g));
   }
   const refBattery = components.find((c) => c.type === 'battery');
-  const groundKey = arduino ? k(arduino.id, 'gnd1') : k(refBattery!.id, 'neg');
+  const groundKey = arduino ? k(arduino.id, profile.grounds[0]) : k(refBattery!.id, 'neg');
   const nets = new Map<string, number>([[uf.find(groundKey), -1]]);
   let count = 0;
   const node = (c: string, p: string): number => {
@@ -161,16 +161,15 @@ function runSolve(
   const addR = (a: number, b: number, ohms: number) => res.push({ a, b, g: 1 / Math.max(ohms, MIN_R) });
 
   if (arduino) {
-    srcs.push({ n: node(arduino.id, '5v'), v: 5, rs: RAIL_5V_RS, label: '5V', kind: '5v' });
-    srcs.push({ n: node(arduino.id, '3v3'), v: 3.3, rs: 1, label: '3.3V', kind: '3v3' });
+    for (const r of profile.rails) srcs.push({ n: node(arduino.id, r.id), v: r.volts, rs: r.rs, label: r.label, kind: r.kind });
   }
-  const arduinoPins = arduino ? [...DIGITAL_PINS, ...ANALOG_PINS] : [];
+  const arduinoPins = arduino ? profile.pins : [];
   for (const p of arduinoPins) {
     const n = node(arduino!.id, p.id);
     const st = pinStates[p.key];
     if (!st) continue;
-    if (st.mode === 'OUTPUT') srcs.push({ n, v: (Math.max(0, Math.min(255, st.value)) / 255) * 5, rs: PIN_RS, label: `pin ${p.key}`, kind: 'pin' });
-    else if (st.mode === 'INPUT_PULLUP') srcs.push({ n, v: 5, rs: PIN_PULLUP_R, label: `pin ${p.key}`, kind: 'pin' });
+    if (st.mode === 'OUTPUT') srcs.push({ n, v: (Math.max(0, Math.min(255, st.value)) / 255) * profile.logicVolts, rs: PIN_RS, label: `pin ${p.key}`, kind: 'pin' });
+    else if (st.mode === 'INPUT_PULLUP') srcs.push({ n, v: profile.logicVolts, rs: PIN_PULLUP_R, label: `pin ${p.key}`, kind: 'pin' });
   }
 
   const batteries: { c: CircuitComponent; pos: number; neg: number; v: number }[] = [];
@@ -206,6 +205,27 @@ function runSolve(
         if (c.properties.isPressed) addR(node(c.id, 'pin1'), node(c.id, 'pin2'), 0.05);
         else { node(c.id, 'pin1'); node(c.id, 'pin2'); }
         break;
+      case 'switch':
+        if (c.properties.closed) addR(node(c.id, 'pin1'), node(c.id, 'pin2'), 0.05);
+        else { node(c.id, 'pin1'); node(c.id, 'pin2'); }
+        break;
+      case 'ldr': {
+        const light = Math.max(0, Math.min(100, Number.isFinite(Number(c.properties.light)) ? Number(c.properties.light) : 50));
+        // De 500 Ω a pleno sol hasta 200 kΩ a oscuras, con variación logarítmica como un LDR real.
+        const ohms = 500 * Math.pow(400, (100 - light) / 100);
+        const la = node(c.id, 'pin1');
+        const lb = node(c.id, 'pin2');
+        addR(la, lb, ohms);
+        resistors.push({ c, a: la, b: lb, ohms });
+        break;
+      }
+      case 'multimeter': {
+        const ma = node(c.id, 'red');
+        const mb = node(c.id, 'black');
+        addR(ma, mb, MULTIMETER_R);
+        resistors.push({ c, a: ma, b: mb, ohms: MULTIMETER_R });
+        break;
+      }
       case 'potentiometer': {
         const max = Number(c.properties.maxResistance) || 10000;
         const raw = Number(c.properties.value);

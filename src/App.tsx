@@ -81,11 +81,11 @@ export function App() {
 
         {/* 3. Área Principal de Contenido: Responsive */}
         <main className="flex-1 relative overflow-hidden flex flex-col md:flex-row">
-          <div className={`h-full w-full ${activeView === 'circuit' ? 'block' : 'hidden md:block md:w-1/2 md:border-r md:border-slate-800'}`}>
+          <div className={`h-full w-full ${activeView === 'circuit' ? 'block' : 'hidden md:block md:w-2/5 md:border-r md:border-slate-800'}`}>
             <CircuitCanvas isRunning={isRunning} />
           </div>
 
-          <div className={`h-full w-full ${activeView !== 'circuit' ? 'block' : 'hidden md:block md:w-1/2'}`}>
+          <div className={`h-full w-full min-w-0 ${activeView !== 'circuit' ? 'block md:w-3/5' : 'hidden md:block md:w-3/5'}`}>
             <EditorContainer
               activeView={activeView === 'circuit' ? 'blocks' : activeView}
             />

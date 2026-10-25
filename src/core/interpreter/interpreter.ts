@@ -281,6 +281,7 @@ export class Interpreter {
       case 'id': {
         const v = scope.find(e.name);
         if (v) return v.value;
+        if (this.hw.constants && e.name in this.hw.constants) return this.hw.constants[e.name];
         if (e.name in CONSTANTS) return CONSTANTS[e.name];
         throw new SketchError(`"${e.name}" no fue declarado`, e.line);
       }

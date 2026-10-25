@@ -6,6 +6,20 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [1.4.0] - ESP32, nuevos componentes y bloques mejorados
+
+### Agregado
+- Placa **ESP32** (lógica 3,3 V, ADC 0–4095, GPIO reales). El **Arduino Uno se puede eliminar** y las placas se reemplazan desde "Agregar componente → Placas".
+- Abstracción de placas (`core/boards.ts`); el solver, el intérprete y los menús de pines de los bloques dependen de la placa activa.
+- **Interruptor**, **LDR** (control de luz) y **Multímetro** (voltímetro).
+- **Sonido real** del buzzer y de `tone()`/`noTone()` (Web Audio, sin internet).
+- **Entrada Serial**: campo de texto en el monitor para `Serial.read/available/readString`.
+- Tests del ESP32, interruptor, LDR y multímetro (31 en total).
+
+### Cambiado
+- Bloques con el renderer **zelos** (más legible y táctil), `ResizeObserver` que corrige el área recortada en PC, y reparto 40/60 circuito/editor.
+- Programa de bloques por defecto usa explícitamente el pin 13.
+
 ## [1.3.0] - Baterías, ley de Ohm y edición de componentes
 
 ### Agregado

@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { CircuitComponent, ComponentType, WireConnection } from '../types/circuit';
 import { createComponentFactory } from '../core/componentsRegistry';
+import { isBoardType } from '../core/boards';
 
 export interface SelectedPinInfo {
   componentId: string;
@@ -75,17 +76,23 @@ export const useCircuitStore = create<CircuitStoreState>((set, get) => ({
     if (x !== undefined && y !== undefined) {
       newComp.x = x;
       newComp.y = y;
-    } else {
+    } else if (!isBoardType(type)) {
       // Posición escalonada para que no se solapen
       const count = get().components.length;
       newComp.x = 250 + (count % 4) * 80;
       newComp.y = 80 + Math.floor(count / 4) * 80;
     }
 
-    set((state) => ({
-      components: [...state.components, newComp],
-      selectedComponentId: newComp.id,
-    }));
+    set((state) => {
+      // El circuito tiene una sola placa: agregar otra reemplaza a la actual y quita sus cables.
+      const replaced = isBoardType(type) ? state.components.filter((c) => isBoardType(c.type)).map((c) => c.id) : [];
+      return {
+        components: [...state.components.filter((c) => !replaced.includes(c.id)), newComp],
+        wires: state.wires.filter((w) => !replaced.includes(w.fromComponentId) && !replaced.includes(w.toComponentId)),
+        selectedComponentId: newComp.id,
+        selectedPin: null,
+      };
+    });
   },
 
   removeComponent: (id) => {

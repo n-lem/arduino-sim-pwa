@@ -15,6 +15,9 @@ interface SimulationStoreState {
   /** Buzzers sonando. */
   buzzerOn: Record<string, boolean>;
   setMeasurements: (m: Record<string, { volts: number; milliamps: number }>, buzzers: Record<string, boolean>) => void;
+  /** Frecuencia activa de tone() en Hz (0 = sin tono). */
+  toneFreq: number;
+  setToneFreq: (freq: number) => void;
   fps: number;
   setIsRunning: (running: boolean) => void;
   setWarnings: (warnings: string[]) => void;
@@ -27,9 +30,11 @@ export const useSimulationStore = create<SimulationStoreState>((set) => ({
   isRunning: false,
   serialLogs: [
     '// Monitor Serial iniciado a 9600 baudios.',
-    '[AVR8js ATmega328P]: Emulador listo para ejecución de código.',
+    '[Intérprete]: Listo. Presioná Iniciar para ejecutar el código.',
   ],
   fps: 60,
+  toneFreq: 0,
+  setToneFreq: (toneFreq) => set((state) => (state.toneFreq === toneFreq ? state : { toneFreq })),
   warnings: [],
   measurements: {},
   buzzerOn: {},

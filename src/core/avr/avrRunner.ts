@@ -18,6 +18,7 @@ import {
 } from 'avr8js';
 import { SketchRunner } from '../interpreter/sketchRunner';
 import type { Hardware } from '../interpreter/hardware';
+import { BOARD_PROFILES, type BoardProfile } from '../boards';
 
 export interface PinStateMap {
   [pin: string]: {
@@ -28,6 +29,8 @@ export interface PinStateMap {
 }
 
 export type PinChangeCallback = (pin: string, isHigh: boolean, value: number) => void;
+/** freq = 0 significa silencio. */
+export type ToneCallback = (pin: string, freq: number, durationMs: number) => void;
 export type SerialOutputCallback = (text: string) => void;
 
 export class AvrRunner {
@@ -47,6 +50,9 @@ export class AvrRunner {
   private pulseInputs: Record<string, number> = {};
   private onPinChangeCallback: PinChangeCallback | null = null;
   private onSerialOutputCallback: SerialOutputCallback | null = null;
+  private onToneCallback: ToneCallback | null = null;
+  private serialInput: number[] = [];
+  private profile: BoardProfile = BOARD_PROFILES['arduino-uno'];
 
   public pinStates: PinStateMap = {};
 
@@ -72,12 +78,16 @@ export class AvrRunner {
     this.initDefaultPinStates();
   }
 
+  /** Perfil de la placa activa: define los pines, la tensión lógica y la resolución del ADC. */
+  public setBoard(profile: BoardProfile) {
+    this.profile = profile;
+    this.initDefaultPinStates();
+  }
+
   private initDefaultPinStates() {
-    for (let i = 0; i <= 13; i++) {
-      this.pinStates[i.toString()] = { isHigh: false, value: 0, mode: 'INPUT' };
-    }
-    for (let i = 0; i <= 5; i++) {
-      this.pinStates[`A${i}`] = { isHigh: false, value: 0, mode: 'INPUT' };
+    this.pinStates = {};
+    for (const p of this.profile.pins) {
+      this.pinStates[p.key] = { isHigh: false, value: 0, mode: 'INPUT' };
     }
   }
 
@@ -130,9 +140,9 @@ export class AvrRunner {
     this.inputLevels[pin] = isHigh ? 1 : 0;
   }
 
-  /** Fija la lectura analógica (0..1023) de un pin A0..A5 (clave "A0"). */
+  /** Fija la lectura analógica (0..adcMax de la placa) de un pin analógico. */
   public setAnalogInput(pin: string, value: number) {
-    this.analogInputs[pin] = Math.max(0, Math.min(1023, Math.round(value)));
+    this.analogInputs[pin] = Math.max(0, Math.min(this.profile.adcMax, Math.round(value)));
   }
 
   /** Fija la duración (µs) que devolverá pulseIn() para un pin (p. ej. eco de un HC-SR04). */
@@ -152,13 +162,25 @@ export class AvrRunner {
   }
 
   private pinKey(pin: number): string {
+    if (this.profile.type === 'esp32') return String(pin);
     return pin >= 14 ? `A${pin - 14}` : String(pin);
+  }
+
+  /** Encola texto escrito por el usuario en el monitor serial para Serial.read()/available(). */
+  public pushSerialInput(text: string) {
+    for (const ch of text) this.serialInput.push(ch.charCodeAt(0));
+  }
+
+  /** Registra quién reproduce el sonido de tone()/noTone(). */
+  public setToneListener(callback: ToneCallback) {
+    this.onToneCallback = callback;
   }
 
   /** Adaptador entre el intérprete y los pines/serie simulados. */
   private createHardware(): Hardware {
     const startedAt = performance.now();
     return {
+      constants: { LED_BUILTIN: this.profile.ledBuiltin },
       pinMode: (pin, mode) => {
         const key = this.pinKey(pin);
         const s = this.pinStates[key];
@@ -176,8 +198,8 @@ export class AvrRunner {
       },
       analogRead: (pin) => this.analogInputs[this.pinKey(pin)] ?? 0,
       serialWrite: (text) => this.onSerialOutputCallback?.(text),
-      serialAvailable: () => 0,
-      serialRead: () => -1,
+      serialAvailable: () => this.serialInput.length,
+      serialRead: () => this.serialInput.shift() ?? -1,
       servoWrite: (pin, angle) => {
         const key = this.pinKey(pin);
         if (this.pinStates[key]) this.pinStates[key].mode = 'OUTPUT';
@@ -186,8 +208,8 @@ export class AvrRunner {
       millis: () => Math.floor(performance.now() - startedAt),
       micros: () => Math.floor((performance.now() - startedAt) * 1000),
       pulseIn: (pin) => this.pulseInputs[this.pinKey(pin)] ?? 0,
-      tone: () => {},
-      noTone: () => {},
+      tone: (pin, freq, durationMs) => this.onToneCallback?.(this.pinKey(pin), freq, durationMs),
+      noTone: (pin) => this.onToneCallback?.(this.pinKey(pin), 0, 0),
     };
   }
 
@@ -203,6 +225,8 @@ export class AvrRunner {
 
   public stop() {
     this.sketch.stop();
+    this.serialInput = [];
+    this.onToneCallback?.('', 0, 0);
     this.initDefaultPinStates();
   }
 

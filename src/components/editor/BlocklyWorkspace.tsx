@@ -64,7 +64,7 @@ export const BlocklyWorkspace: React.FC = () => {
         colour: '#1e293b', // Cuadrícula sutil sobre fondo oscuro
         snap: true,
       },
-      renderer: 'geras',
+      renderer: 'zelos',
     });
 
     workspaceRef.current = workspace;
@@ -82,11 +82,11 @@ export const BlocklyWorkspace: React.FC = () => {
       // Sketch inicial (parpadeo). Se carga desde XML para que Blockly conecte bien los números a cada "Esperar".
       const seed = `<xml xmlns="https://developers.google.com/blockly/xml">
         <block type="arduino_base" x="30" y="25">
-          <statement name="SETUP"><block type="arduino_pin_mode"></block></statement>
+          <statement name="SETUP"><block type="arduino_pin_mode"><field name="PIN">13</field></block></statement>
           <statement name="LOOP">
-            <block type="arduino_digital_write"><field name="STATE">HIGH</field>
+            <block type="arduino_digital_write"><field name="PIN">13</field><field name="STATE">HIGH</field>
               <next><block type="arduino_delay"><value name="MS"><block type="math_number"><field name="NUM">1000</field></block></value>
-                <next><block type="arduino_digital_write"><field name="STATE">LOW</field>
+                <next><block type="arduino_digital_write"><field name="PIN">13</field><field name="STATE">LOW</field>
                   <next><block type="arduino_delay"><value name="MS"><block type="math_number"><field name="NUM">1000</field></block></value></block></next>
                 </block></next>
               </block></next>
@@ -134,13 +134,16 @@ export const BlocklyWorkspace: React.FC = () => {
       setBlocklyXml(lastXml);
     }
 
-    // Redimensionamiento responsive
+    // Redimensionamiento: el contenedor cambia al alternar pestañas o pantalla dividida, no solo la ventana.
+    const observer = new ResizeObserver(() => Blockly.svgResize(workspace));
+    observer.observe(blocklyDivRef.current);
     const handleResize = () => {
       Blockly.svgResize(workspace);
     };
     window.addEventListener('resize', handleResize);
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', handleResize);
       workspace.dispose();
     };

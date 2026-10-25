@@ -1,9 +1,23 @@
 /**
  * @file arduinoBlocks.ts
- * @description Definición de bloques educativos en español para Arduino Uno en Google Blockly.
+ * @description Definición de bloques educativos en español para Arduino/ESP32 en Google Blockly.
+ * Los menús de pines dependen de la placa que haya en el circuito.
  */
 
 import * as Blockly from 'blockly';
+import { activeProfile, pinOptions } from '../boards';
+import { useCircuitStore } from '../../stores/useCircuitStore';
+
+type PinKind = Parameters<typeof pinOptions>[1];
+
+/**
+ * Menú de pines que se calcula al abrirse, según la placa actual del circuito.
+ * @param kind Tipo de pines a mostrar.
+ */
+const pinMenu = (kind: PinKind) => (): [string, string][] => {
+  const options = pinOptions(activeProfile(useCircuitStore.getState().components), kind);
+  return options.length ? options : [['—', '0']];
+};
 
 /**
  * Registra todos los bloques personalizados para Arduino en el registro global de Blockly.
@@ -12,7 +26,7 @@ export function registerArduinoBlocks(): void {
   // 1. Estructura Principal: Setup y Loop
   Blockly.Blocks['arduino_base'] = {
     init: function () {
-      this.appendDummyInput().appendField('🟢 Programa Arduino Uno');
+      this.appendDummyInput().appendField('🟢 Programa principal');
       this.appendStatementInput('SETUP').appendField('⚙️ Configuración (setup - se ejecuta una vez):');
       this.appendStatementInput('LOOP').appendField('🔁 Bucle Principal (loop - se repite siempre):');
       this.setColour('#00979D');
@@ -27,29 +41,7 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendDummyInput()
         .appendField('Configurar Pin')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['13 (LED Integrado)', '13'],
-            ['12', '12'],
-            ['11 (~PWM)', '11'],
-            ['10 (~PWM)', '10'],
-            ['9 (~PWM)', '9'],
-            ['8', '8'],
-            ['7', '7'],
-            ['6 (~PWM)', '6'],
-            ['5 (~PWM)', '5'],
-            ['4', '4'],
-            ['3 (~PWM)', '3'],
-            ['2', '2'],
-            ['A0', 'A0'],
-            ['A1', 'A1'],
-            ['A2', 'A2'],
-            ['A3', 'A3'],
-            ['A4', 'A4'],
-            ['A5', 'A5'],
-          ]),
-          'PIN'
-        )
+        .appendField(new Blockly.FieldDropdown(pinMenu('any')), 'PIN')
         .appendField('como')
         .appendField(
           new Blockly.FieldDropdown([
@@ -71,23 +63,7 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendDummyInput()
         .appendField('Escribir en Pin Digital')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['13 (LED)', '13'],
-            ['12', '12'],
-            ['11 (~)', '11'],
-            ['10 (~)', '10'],
-            ['9 (~)', '9'],
-            ['8', '8'],
-            ['7', '7'],
-            ['6 (~)', '6'],
-            ['5 (~)', '5'],
-            ['4', '4'],
-            ['3 (~)', '3'],
-            ['2', '2'],
-          ]),
-          'PIN'
-        )
+        .appendField(new Blockly.FieldDropdown(pinMenu('output')), 'PIN')
         .appendField('estado')
         .appendField(
           new Blockly.FieldDropdown([
@@ -99,7 +75,7 @@ export function registerArduinoBlocks(): void {
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour('#2563EB');
-      this.setTooltip('Envía 5V (HIGH) o 0V (LOW) al pin especificado.');
+      this.setTooltip('Envía la tensión de la placa (HIGH) o 0 V (LOW) al pin especificado.');
     },
   };
 
@@ -108,23 +84,7 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendDummyInput()
         .appendField('Leer Pin Digital')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['2', '2'],
-            ['3 (~)', '3'],
-            ['4', '4'],
-            ['5 (~)', '5'],
-            ['6 (~)', '6'],
-            ['7', '7'],
-            ['8', '8'],
-            ['9 (~)', '9'],
-            ['10 (~)', '10'],
-            ['11 (~)', '11'],
-            ['12', '12'],
-            ['13', '13'],
-          ]),
-          'PIN'
-        );
+        .appendField(new Blockly.FieldDropdown(pinMenu('digital')), 'PIN');
       this.setOutput(true, 'Boolean');
       this.setColour('#2563EB');
       this.setTooltip('Devuelve verdadero (HIGH) si recibe voltaje o falso (LOW).');
@@ -150,17 +110,7 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendDummyInput()
         .appendField('Escribir PWM en Pin')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['3 (~PWM)', '3'],
-            ['5 (~PWM)', '5'],
-            ['6 (~PWM)', '6'],
-            ['9 (~PWM)', '9'],
-            ['10 (~PWM)', '10'],
-            ['11 (~PWM)', '11'],
-          ]),
-          'PIN'
-        );
+        .appendField(new Blockly.FieldDropdown(pinMenu('pwm')), 'PIN');
       this.appendValueInput('VALUE')
         .setCheck('Number')
         .appendField('valor (0 a 255):');
@@ -171,25 +121,15 @@ export function registerArduinoBlocks(): void {
     },
   };
 
-  // 7. Analog Read: Leer sensor analógico (A0 a A5)
+  // 7. Analog Read: Leer sensor analógico
   Blockly.Blocks['arduino_analog_read'] = {
     init: function () {
       this.appendDummyInput()
         .appendField('Leer Pin Analógico')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['A0', 'A0'],
-            ['A1', 'A1'],
-            ['A2', 'A2'],
-            ['A3', 'A3'],
-            ['A4', 'A4'],
-            ['A5', 'A5'],
-          ]),
-          'PIN'
-        );
+        .appendField(new Blockly.FieldDropdown(pinMenu('analog')), 'PIN');
       this.setOutput(true, 'Number');
       this.setColour('#7C3AED');
-      this.setTooltip('Lee el voltaje en un pin analógico y devuelve un valor entre 0 y 1023.');
+      this.setTooltip('Lee el voltaje en un pin analógico: 0 a 1023 en Arduino Uno y 0 a 4095 en ESP32.');
     },
   };
 
@@ -218,17 +158,7 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendDummyInput()
         .appendField('⚙️ Mover Servo SG90 en Pin')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['9 (~PWM)', '9'],
-            ['10 (~PWM)', '10'],
-            ['11 (~PWM)', '11'],
-            ['6 (~PWM)', '6'],
-            ['5 (~PWM)', '5'],
-            ['3 (~PWM)', '3'],
-          ]),
-          'PIN'
-        );
+        .appendField(new Blockly.FieldDropdown(pinMenu('pwm')), 'PIN');
       this.appendValueInput('ANGLE')
         .setCheck('Number')
         .appendField('a ángulo (0° a 180°):');
@@ -245,39 +175,9 @@ export function registerArduinoBlocks(): void {
       this.appendDummyInput()
         .appendField('📏 Distancia Ultrasónico HC-SR04')
         .appendField('Trig:')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['9', '9'],
-            ['10', '10'],
-            ['11', '11'],
-            ['12', '12'],
-            ['8', '8'],
-            ['7', '7'],
-            ['6', '6'],
-            ['5', '5'],
-            ['4', '4'],
-            ['3', '3'],
-            ['2', '2'],
-          ]),
-          'TRIG'
-        )
+        .appendField(new Blockly.FieldDropdown(pinMenu('output')), 'TRIG')
         .appendField('Echo:')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['8', '8'],
-            ['9', '9'],
-            ['10', '10'],
-            ['11', '11'],
-            ['12', '12'],
-            ['7', '7'],
-            ['6', '6'],
-            ['5', '5'],
-            ['4', '4'],
-            ['3', '3'],
-            ['2', '2'],
-          ]),
-          'ECHO'
-        );
+        .appendField(new Blockly.FieldDropdown(pinMenu('digital')), 'ECHO');
       this.setOutput(true, 'Number');
       this.setColour('#0284C7');
       this.setTooltip('Calcula la distancia en centímetros medida por el sensor ultrasónico HC-SR04.');

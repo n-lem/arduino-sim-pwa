@@ -56,8 +56,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [contenteditable="true"], .cm-editor, .blocklyWidgetDiv')) return;
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
-        const comp = useCircuitStore.getState().components.find((c) => c.id === selectedComponentId);
-        if (comp && comp.type !== 'arduino-uno') removeComponent(selectedComponentId);
+        removeComponent(selectedComponentId);
       }
     };
     window.addEventListener('keydown', onKey);

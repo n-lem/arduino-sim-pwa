@@ -15,6 +15,10 @@ import { UltrasonicPart } from './UltrasonicPart';
 import { BatteryPart } from './BatteryPart';
 import { BuzzerPart } from './BuzzerPart';
 import { PotentiometerPart } from './PotentiometerPart';
+import { Esp32Part } from './Esp32Part';
+import { SwitchPart } from './SwitchPart';
+import { LdrPart } from './LdrPart';
+import { MultimeterPart } from './MultimeterPart';
 import { Trash2 } from 'lucide-react';
 
 interface ComponentRendererProps {
@@ -96,8 +100,8 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
         isSelected ? 'ring-2 ring-arduino-teal/80 ring-offset-2 ring-offset-slate-950 rounded-lg' : ''
       }`}
     >
-      {/* Botón flotante para eliminar componente cuando está seleccionado (excepto el Arduino Uno) */}
-      {isSelected && component.type !== 'arduino-uno' && (
+      {/* Botón flotante para eliminar componente cuando está seleccionado */}
+      {isSelected && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -162,6 +166,25 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
           onDistanceChange={(cm) => onPropertyChange(component.id, 'distanceCm', cm)}
         />
       )}
+      {component.type === 'esp32' && (
+        <Esp32Part component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} isRunning={isRunning} />
+      )}
+
+      {component.type === 'switch' && (
+        <SwitchPart
+          component={component}
+          selectedPin={selectedPin}
+          onPinTouch={onPinTouch}
+          onToggle={(closed) => onPropertyChange(component.id, 'closed', closed)}
+        />
+      )}
+
+      {component.type === 'ldr' && <LdrPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />}
+
+      {component.type === 'multimeter' && (
+        <MultimeterPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />
+      )}
+
       {component.type === 'battery' && (
         <BatteryPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />
       )}

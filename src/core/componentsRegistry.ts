@@ -90,6 +90,34 @@ export function getArduinoUnoPins(): PinDefinition[] {
   return pins;
 }
 
+/** Ancho y alto del dibujo de la placa ESP32. */
+export const ESP32_SIZE = { width: 130, height: 260 };
+
+/**
+ * Pines de un ESP32 DevKit de 30 pines (15 por lado). Los pines GPIO usan el id `d<GPIO>`.
+ */
+export function getEsp32Pins(): PinDefinition[] {
+  type Spec = { id: string; name: string; type: PinDefinition['type'] };
+  const gpio = (n: number, name?: string): Spec => ({ id: `d${n}`, name: name ?? String(n), type: 'digital' });
+  const left: Spec[] = [
+    { id: 'en', name: 'EN', type: 'passive' },
+    gpio(36, 'VP'), gpio(39, 'VN'), gpio(34), gpio(35), gpio(32), gpio(33), gpio(25), gpio(26), gpio(27),
+    gpio(14), gpio(12),
+    { id: 'gnd1', name: 'GND', type: 'ground' },
+    gpio(13),
+    { id: 'vin', name: 'VIN', type: 'power' },
+  ];
+  const right: Spec[] = [
+    { id: '3v3', name: '3V3', type: 'power' },
+    { id: 'gnd2', name: 'GND', type: 'ground' },
+    gpio(15), gpio(2), gpio(4), gpio(16), gpio(17), gpio(5), gpio(18), gpio(19), gpio(21),
+    gpio(3, 'RX0'), gpio(1, 'TX0'), gpio(22), gpio(23),
+  ];
+  const place = (specs: Spec[], x: number): PinDefinition[] =>
+    specs.map((s, i) => ({ id: s.id, name: s.name, type: s.type, pinNumber: s.id, x, y: 40 + i * 14 }));
+  return [...place(left, 10), ...place(right, ESP32_SIZE.width - 10)];
+}
+
 /**
  * Genera la configuración inicial para un nuevo componente dado su tipo.
  */
@@ -253,6 +281,63 @@ export function createComponentFactory(type: ComponentType, idSuffix?: string): 
         properties: {
           voltage: 9,
         },
+      };
+
+    case 'esp32':
+      return {
+        id,
+        type: 'esp32',
+        name: 'ESP32 DevKit',
+        x: 80,
+        y: 40,
+        rotation: 0,
+        pins: getEsp32Pins(),
+        properties: { mcu: 'ESP32-WROOM-32', clockSpeed: 240000000 },
+      };
+
+    case 'switch':
+      return {
+        id,
+        type: 'switch',
+        name: 'Interruptor',
+        x: 420,
+        y: 230,
+        rotation: 0,
+        pins: [
+          { id: 'pin1', name: 'Pin 1', type: 'passive', x: 12, y: 30 },
+          { id: 'pin2', name: 'Pin 2', type: 'passive', x: 68, y: 30 },
+        ],
+        properties: { closed: false },
+      };
+
+    case 'ldr':
+      return {
+        id,
+        type: 'ldr',
+        name: 'Fotorresistencia (LDR)',
+        x: 420,
+        y: 310,
+        rotation: 0,
+        pins: [
+          { id: 'pin1', name: 'Pin 1', type: 'passive', x: 22, y: 64 },
+          { id: 'pin2', name: 'Pin 2', type: 'passive', x: 48, y: 64 },
+        ],
+        properties: { light: 60 },
+      };
+
+    case 'multimeter':
+      return {
+        id,
+        type: 'multimeter',
+        name: 'Multímetro',
+        x: 520,
+        y: 400,
+        rotation: 0,
+        pins: [
+          { id: 'red', name: 'Punta roja (V+)', type: 'power', x: 30, y: 96 },
+          { id: 'black', name: 'Punta negra (COM)', type: 'ground', x: 70, y: 96 },
+        ],
+        properties: {},
       };
 
     default:

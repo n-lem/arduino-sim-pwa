@@ -12,7 +12,11 @@ export type ComponentType =
   | 'ultrasonic-hcsr04'
   | 'potentiometer'
   | 'buzzer'
-  | 'battery';
+  | 'battery'
+  | 'esp32'
+  | 'switch'
+  | 'ldr'
+  | 'multimeter';
 
 export type PinType = 'digital' | 'analog' | 'power' | 'ground' | 'pwm' | 'passive';
 
