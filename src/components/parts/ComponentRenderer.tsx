@@ -19,6 +19,7 @@ import { Esp32Part } from './Esp32Part';
 import { SwitchPart } from './SwitchPart';
 import { LdrPart } from './LdrPart';
 import { MultimeterPart } from './MultimeterPart';
+import { BreadboardPart } from './BreadboardPart';
 import { Trash2 } from 'lucide-react';
 
 interface ComponentRendererProps {
@@ -88,6 +89,7 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
     <div
       style={{
         transform: `translate(${component.x}px, ${component.y}px)`,
+        zIndex: component.type === 'breadboard' ? 0 : 2,
         touchAction: 'none',
       }}
       onPointerDown={handlePointerDown}
@@ -183,6 +185,10 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
 
       {component.type === 'multimeter' && (
         <MultimeterPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />
+      )}
+
+      {component.type === 'breadboard' && (
+        <BreadboardPart component={component} selectedPin={selectedPin} onPinTouch={onPinTouch} />
       )}
 
       {component.type === 'battery' && (

@@ -4,6 +4,7 @@
  */
 
 import type { CircuitComponent, ComponentType, PinDefinition } from '../types/circuit';
+import { BREADBOARD_SIZES, getBreadboardPins, type BreadboardSize } from './breadboard';
 
 /**
  * Genera la definición de pines para la placa Arduino Uno R3.
@@ -121,10 +122,28 @@ export function getEsp32Pins(): PinDefinition[] {
 /**
  * Genera la configuración inicial para un nuevo componente dado su tipo.
  */
-export function createComponentFactory(type: ComponentType, idSuffix?: string): CircuitComponent {
+export function createComponentFactory(
+  type: ComponentType,
+  idSuffix?: string,
+  options?: { size?: BreadboardSize }
+): CircuitComponent {
   const id = `${type}-${idSuffix || Math.random().toString(36).substring(2, 7)}`;
 
   switch (type) {
+    case 'breadboard': {
+      const size = options?.size ?? 'medium';
+      return {
+        id,
+        type: 'breadboard',
+        name: `Protoboard ${BREADBOARD_SIZES[size].label.toLowerCase()}`,
+        x: 40,
+        y: 360,
+        rotation: 0,
+        pins: getBreadboardPins(size),
+        properties: { size },
+      };
+    }
+
     case 'arduino-uno':
       return {
         id,

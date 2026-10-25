@@ -11,6 +11,7 @@
 import type { CircuitComponent, WireConnection } from '../../types/circuit';
 import type { PinStateMap } from '../avr/avrRunner';
 import { BOARD_PROFILES, findBoard, type BoardProfile } from '../boards';
+import { breadboardGroups } from '../breadboard';
 
 /** Resultado de resolver el circuito para un estado dado de los pines del Arduino. */
 export interface SolveResult {
@@ -141,6 +142,13 @@ function runSolve(
   const k = (c: string, p: string) => `${c}:${p}`;
   const uf = new UnionFind();
   for (const w of wires) uf.union(k(w.fromComponentId, w.fromPinId), k(w.toComponentId, w.toPinId));
+  // Las tiras internas de las protoboards unen sus agujeros.
+  for (const c of components) {
+    if (c.type !== 'breadboard') continue;
+    for (const group of breadboardGroups(c)) {
+      for (let i = 1; i < group.length; i++) uf.union(k(c.id, group[0]), k(c.id, group[i]));
+    }
+  }
   // Referencia de 0 V: GND del Arduino o, si no hay placa, el negativo de la primera batería.
   if (arduino) {
     for (const g of profile.grounds.slice(1)) uf.union(k(arduino.id, profile.grounds[0]), k(arduino.id, g));

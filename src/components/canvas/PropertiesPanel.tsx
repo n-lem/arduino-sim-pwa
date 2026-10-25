@@ -7,6 +7,8 @@
 import React from 'react';
 import { Trash2, X } from 'lucide-react';
 import { isBoardType } from '../../core/boards';
+import { BREADBOARD_SIZE_LIST } from '../../core/breadboard';
+import { useCircuitStore } from '../../stores/useCircuitStore';
 import type { CircuitComponent } from '../../types/circuit';
 import { useSimulationStore } from '../../stores/useSimulationStore';
 import {
@@ -74,6 +76,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ component, onC
   const measurement = useSimulationStore((s) => s.measurements[component.id]);
   const props = component.properties;
   const isBoard = isBoardType(component.type);
+  const resizeBreadboard = useCircuitStore((s) => s.resizeBreadboard);
 
   return (
     <div
@@ -248,6 +251,26 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ component, onC
             />
             <span className="w-10 text-right text-slate-200 font-mono">{Number(props.light) || 0}%</span>
           </label>
+        )}
+
+        {component.type === 'breadboard' && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              {BREADBOARD_SIZE_LIST.map((b) => (
+                <button
+                  key={b.size}
+                  className={chipClass(props.size === b.size)}
+                  onClick={() => resizeBreadboard(component.id, b.size)}
+                  title={b.hint}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">
+              Columnas: a–e y f–j unidas en vertical; rieles +/− unidos en horizontal. Si achicás la protoboard se quitan los cables de los agujeros que desaparecen.
+            </p>
+          </div>
         )}
 
         {component.type === 'multimeter' && (

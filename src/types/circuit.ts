@@ -16,7 +16,8 @@ export type ComponentType =
   | 'esp32'
   | 'switch'
   | 'ldr'
-  | 'multimeter';
+  | 'multimeter'
+  | 'breadboard';
 
 export type PinType = 'digital' | 'analog' | 'power' | 'ground' | 'pwm' | 'passive';
 

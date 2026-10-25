@@ -6,6 +6,14 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [1.5.0] - Protoboard y desplazamiento del lienzo
+
+### Agregado
+- **Protoboard** en 4 tamaños: mini (10 columnas), chica (17), mediana (30) y grande (63). Se cambia el tamaño desde el panel de propiedades (los cables de agujeros que desaparecen se quitan).
+- El solver une las tiras internas: columnas a–e y f–j, y rieles +/− (`core/breadboard.ts`).
+- **Desplazamiento del lienzo** arrastrando el fondo (mouse o dedo) y zoom hasta 30 %, para usar protoboards grandes en celulares y notebooks chicas.
+- Test de continuidad de la protoboard (32 tests).
+
 ## [1.4.0] - ESP32, nuevos componentes y bloques mejorados
 
 ### Agregado

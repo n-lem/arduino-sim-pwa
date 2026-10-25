@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { CircuitComponent, ComponentType, WireConnection } from '../types/circuit';
 import { createComponentFactory } from '../core/componentsRegistry';
 import { isBoardType } from '../core/boards';
+import { BREADBOARD_SIZES, getBreadboardPins, type BreadboardSize } from '../core/breadboard';
 
 export interface SelectedPinInfo {
   componentId: string;
@@ -20,7 +21,9 @@ interface CircuitStoreState {
   selectedComponentId: string | null;
 
   // Acciones de Componentes
-  addComponent: (type: ComponentType, x?: number, y?: number) => void;
+  addComponent: (type: ComponentType, x?: number, y?: number, options?: { size?: BreadboardSize }) => void;
+  /** Cambia el tamaño de una protoboard conservando los cables cuyos agujeros siguen existiendo. */
+  resizeBreadboard: (id: string, size: BreadboardSize) => void;
   removeComponent: (id: string) => void;
   updateComponentPosition: (id: string, x: number, y: number) => void;
   updateComponentProperty: (id: string, property: string, value: any) => void;
@@ -71,8 +74,8 @@ export const useCircuitStore = create<CircuitStoreState>((set, get) => ({
   selectedPin: null,
   selectedComponentId: null,
 
-  addComponent: (type, x, y) => {
-    const newComp = createComponentFactory(type);
+  addComponent: (type, x, y, options) => {
+    const newComp = createComponentFactory(type, undefined, options);
     if (x !== undefined && y !== undefined) {
       newComp.x = x;
       newComp.y = y;
@@ -90,6 +93,22 @@ export const useCircuitStore = create<CircuitStoreState>((set, get) => ({
         components: [...state.components.filter((c) => !replaced.includes(c.id)), newComp],
         wires: state.wires.filter((w) => !replaced.includes(w.fromComponentId) && !replaced.includes(w.toComponentId)),
         selectedComponentId: newComp.id,
+        selectedPin: null,
+      };
+    });
+  },
+
+  resizeBreadboard: (id, size) => {
+    set((state) => {
+      const comp = state.components.find((c) => c.id === id && c.type === 'breadboard');
+      if (!comp) return state;
+      const pins = getBreadboardPins(size);
+      const ids = new Set(pins.map((p) => p.id));
+      const updated = { ...comp, pins, name: `Protoboard ${BREADBOARD_SIZES[size].label.toLowerCase()}`, properties: { ...comp.properties, size } };
+      const keep = (cid: string, pid: string) => cid !== id || ids.has(pid);
+      return {
+        components: state.components.map((c) => (c.id === id ? updated : c)),
+        wires: state.wires.filter((w) => keep(w.fromComponentId, w.fromPinId) && keep(w.toComponentId, w.toPinId)),
         selectedPin: null,
       };
     });

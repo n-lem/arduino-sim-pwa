@@ -4,11 +4,12 @@
  */
 
 import React from 'react';
-import { Plus, X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu, Sun, ToggleLeft } from 'lucide-react';
+import { Plus, X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu, Sun, ToggleLeft, Grid3x3 } from 'lucide-react';
 import type { ComponentType } from '../../types/circuit';
+import { BREADBOARD_SIZE_LIST, type BreadboardSize } from '../../core/breadboard';
 
 interface ComponentPaletteProps {
-  onAddComponent: (type: ComponentType) => void;
+  onAddComponent: (type: ComponentType, options?: { size?: BreadboardSize }) => void;
 }
 
 interface ComponentItem {
@@ -16,6 +17,7 @@ interface ComponentItem {
   label: string;
   hint: string;
   icon: React.ElementType;
+  size?: BreadboardSize;
 }
 
 interface Category {
@@ -30,6 +32,16 @@ const CATEGORIES: Category[] = [
       { type: 'arduino-uno', label: 'Arduino Uno', hint: '5 V · 14 pines digitales · 6 analógicos', icon: Cpu },
       { type: 'esp32', label: 'ESP32', hint: '3,3 V · GPIO · ADC de 12 bits', icon: Cpu },
     ],
+  },
+  {
+    title: 'Protoboards',
+    items: BREADBOARD_SIZE_LIST.map((b) => ({
+      type: 'breadboard' as ComponentType,
+      label: `Protoboard ${b.label.toLowerCase()}`,
+      hint: b.hint,
+      icon: Grid3x3,
+      size: b.size,
+    })),
   },
   {
     title: 'Fuentes de energía',
@@ -83,9 +95,9 @@ export const ComponentPalette: React.FC<ComponentPaletteProps> = ({ onAddCompone
                   const Icon = item.icon;
                   return (
                     <button
-                      key={item.type}
+                      key={item.size ? `${item.type}-${item.size}` : item.type}
                       onClick={() => {
-                        onAddComponent(item.type);
+                        onAddComponent(item.type, item.size ? { size: item.size } : undefined);
                         setOpen(false);
                       }}
                       className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-left transition active:scale-[0.98]"

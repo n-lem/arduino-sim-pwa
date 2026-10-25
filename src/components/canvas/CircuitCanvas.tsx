@@ -11,6 +11,7 @@ import { ComponentRenderer } from '../parts/ComponentRenderer';
 import { useCircuitStore } from '../../stores/useCircuitStore';
 import { useSimulationStore } from '../../stores/useSimulationStore';
 import type { ComponentType } from '../../types/circuit';
+import type { BreadboardSize } from '../../core/breadboard';
 import { ZoomIn, ZoomOut, RotateCcw, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface CircuitCanvasProps {
@@ -35,6 +36,31 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
 
   const warnings = useSimulationStore((s) => s.warnings);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = React.useRef<{ sx: number; sy: number; px: number; py: number; moved: boolean } | null>(null);
+  const justPannedRef = React.useRef(false);
+
+  /** Arrastrar el fondo desplaza la vista (necesario para protoboards grandes en pantallas chicas). */
+  const onBgPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    panRef.current = { sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y, moved: false };
+  };
+  const onBgPointerMove = (e: React.PointerEvent) => {
+    const p = panRef.current;
+    if (!p) return;
+    const dx = e.clientX - p.sx;
+    const dy = e.clientY - p.sy;
+    if (!p.moved && Math.hypot(dx, dy) < 5) return;
+    p.moved = true;
+    setPan({ x: p.px + dx, y: p.py + dy });
+  };
+  const onBgPointerUp = () => {
+    if (panRef.current?.moved) {
+      justPannedRef.current = true;
+      setTimeout(() => (justPannedRef.current = false), 0);
+    }
+    panRef.current = null;
+  };
   const [wireNotice, setWireNotice] = useState<string | null>(null);
 
   const selectedComponent = components.find((c) => c.id === selectedPin?.componentId);
@@ -63,16 +89,22 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedComponentId, removeComponent]);
 
-  const handleAddComponent = (type: ComponentType) => {
-    addComponent(type);
+  const handleAddComponent = (type: ComponentType, options?: { size?: BreadboardSize }) => {
+    addComponent(type, undefined, undefined, options);
   };
 
   return (
     <div
       id="circuit-canvas-container"
       onClick={() => {
+        if (justPannedRef.current) return;
         selectComponent(null);
       }}
+      onPointerDown={onBgPointerDown}
+      onPointerMove={onBgPointerMove}
+      onPointerUp={onBgPointerUp}
+      onPointerCancel={onBgPointerUp}
+      style={{ touchAction: 'none' }}
       className="relative w-full h-full bg-slate-950 overflow-hidden flex flex-col select-none"
     >
       {/* Fondo de Cuadrícula / Grid de ingeniería */}
@@ -101,7 +133,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setZoom((prev) => Math.max(prev - 0.15, 0.5));
+            setZoom((prev) => Math.max(prev - 0.15, 0.3));
           }}
           className="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition active:scale-95"
           title="Alejar (Zoom Out)"
@@ -112,6 +144,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
           onClick={(e) => {
             e.stopPropagation();
             setZoom(1);
+            setPan({ x: 0, y: 0 });
           }}
           className="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition active:scale-95"
           title="Restablecer vista 100%"
@@ -168,7 +201,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
       <div
         className="w-full h-full relative"
         style={{
-          transform: `scale(${zoom})`,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: 'top left',
         }}
       >

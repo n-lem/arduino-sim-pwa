@@ -94,6 +94,18 @@ describe('ESP32, interruptor, LDR y multímetro', () => {
     expect(bright).toBeGreaterThan(dark);
   });
 
+  it('protoboard: una columna a–e une dos componentes y f–j queda aislada', () => {
+    const b = bat(9); const bb = createComponentFactory('breadboard', 'p');
+    const r1 = res(); r1.properties.resistance = 1000;
+    const ws = [
+      wire(b.id, 'pos', bb.id, 'a1'), wire(r1.id, 'pin1', bb.id, 'e1'),
+      wire(r1.id, 'pin2', bb.id, 'tn0'), wire(b.id, 'neg', bb.id, 'tn3'),
+    ];
+    expect(solveCircuitPhysics([b, bb, r1], ws, pins()).measurements[r1.id].milliamps).toBeCloseTo(9, 0);
+    const ws2 = [wire(b.id, 'pos', bb.id, 'a1'), wire(r1.id, 'pin1', bb.id, 'f1'), wire(r1.id, 'pin2', b.id, 'neg')];
+    expect(solveCircuitPhysics([b, bb, r1], ws2, pins()).measurements[r1.id].milliamps).toBeCloseTo(0, 1);
+  });
+
   it('multímetro mide la tensión de la batería', () => {
     const b = bat(9); const m = createComponentFactory('multimeter', 'm');
     const r = solveCircuitPhysics([b, m], [wire(b.id, 'pos', m.id, 'red'), wire(m.id, 'black', b.id, 'neg')], pins());
