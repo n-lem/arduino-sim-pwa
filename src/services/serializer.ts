@@ -4,6 +4,7 @@
  */
 
 import type { ArduinoProjectSchema } from '../types/schema';
+import { getBreadboardPins, isBreadboardSize } from '../core/breadboard';
 
 /**
  * Convierte un proyecto en una cadena JSON formateada con sangría.
@@ -54,7 +55,12 @@ export function deserializeProject(jsonContent: string): ArduinoProjectSchema {
       x: typeof c.x === 'number' ? c.x : 100,
       y: typeof c.y === 'number' ? c.y : 100,
       rotation: c.rotation || 0,
-      pins: Array.isArray(c.pins) ? c.pins : [],
+      pins:
+        c.type === 'breadboard'
+          ? getBreadboardPins(isBreadboardSize(c.properties?.size) ? c.properties.size : 'medium')
+          : Array.isArray(c.pins)
+            ? c.pins
+            : [],
       properties: c.properties || {},
     })),
     wires: parsed.wires.map((w: any) => ({
@@ -64,6 +70,7 @@ export function deserializeProject(jsonContent: string): ArduinoProjectSchema {
       toComponentId: w.toComponentId,
       toPinId: w.toPinId,
       color: w.color || '#3B82F6',
+      ...(w.plug ? { plug: true } : {}),
     })),
     code: typeof parsed.code === 'string' ? parsed.code : '// Código importado\nvoid setup() {}\nvoid loop() {}',
     blocklyXml: typeof parsed.blocklyXml === 'string' ? parsed.blocklyXml : null,

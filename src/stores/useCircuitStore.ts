@@ -8,6 +8,14 @@ import type { CircuitComponent, ComponentType, WireConnection } from '../types/c
 import { createComponentFactory } from '../core/componentsRegistry';
 import { isBoardType } from '../core/boards';
 import { BREADBOARD_SIZES, getBreadboardPins, type BreadboardSize } from '../core/breadboard';
+import {
+  computePlugs,
+  computeSnap,
+  getComponentCenter,
+  getComponentSize,
+  normalizeRotation,
+  rotatePoint,
+} from '../core/geometry';
 
 export interface SelectedPinInfo {
   componentId: string;
@@ -26,6 +34,10 @@ interface CircuitStoreState {
   resizeBreadboard: (id: string, size: BreadboardSize) => void;
   removeComponent: (id: string) => void;
   updateComponentPosition: (id: string, x: number, y: number) => void;
+  /** Encaja el componente en la protoboard más cercana (si corresponde) al soltarlo. */
+  settleComponent: (id: string) => void;
+  /** Gira 90° el componente (si es una protoboard, lo enchufado gira con ella). */
+  rotateComponent: (id: string) => void;
   updateComponentProperty: (id: string, property: string, value: any) => void;
   selectComponent: (id: string | null) => void;
 
@@ -124,9 +136,64 @@ export const useCircuitStore = create<CircuitStoreState>((set, get) => ({
   },
 
   updateComponentPosition: (id, x, y) => {
-    set((state) => ({
-      components: state.components.map((c) => (c.id === id ? { ...c, x, y } : c)),
-    }));
+    set((state) => {
+      const moving = state.components.find((c) => c.id === id);
+      if (!moving) return state;
+      const dx = x - moving.x;
+      const dy = y - moving.y;
+      // Al mover una protoboard, lo enchufado en ella la acompaña.
+      const carried = new Set(
+        moving.type === 'breadboard'
+          ? state.wires.filter((w) => w.plug && w.toComponentId === id).map((w) => w.fromComponentId)
+          : []
+      );
+      return {
+        components: state.components.map((c) =>
+          c.id === id ? { ...c, x, y } : carried.has(c.id) ? { ...c, x: c.x + dx, y: c.y + dy } : c
+        ),
+      };
+    });
+  },
+
+  settleComponent: (id) => {
+    set((state) => {
+      const comp = state.components.find((c) => c.id === id);
+      if (!comp || comp.type === 'breadboard') return state;
+      const boards = state.components.filter((c) => c.type === 'breadboard');
+      const free = state.wires.filter((w) => !(w.plug && w.fromComponentId === id));
+      const snap = computeSnap(comp, boards);
+      const moved = snap ? { ...comp, x: comp.x + snap.dx, y: comp.y + snap.dy } : comp;
+      const plugs = snap ? computePlugs(moved, boards) : [];
+      // Un agujero ocupado por otro componente no admite una segunda pata.
+      const taken = new Set(free.filter((w) => w.plug).map((w) => `${w.toComponentId}:${w.toPinId}`));
+      const accepted = plugs.filter((p) => !taken.has(`${p.toComponentId}:${p.toPinId}`));
+      return {
+        components: state.components.map((c) => (c.id === id ? moved : c)),
+        wires: [...free, ...accepted],
+      };
+    });
+  },
+
+  rotateComponent: (id) => {
+    set((state) => {
+      const comp = state.components.find((c) => c.id === id);
+      if (!comp) return state;
+      const center = getComponentCenter(comp);
+      const rotateAbout = (c: CircuitComponent): CircuitComponent => {
+        const size = getComponentSize(c);
+        const cc = rotatePoint(getComponentCenter(c), center, 90);
+        return { ...c, x: cc.x - size.width / 2, y: cc.y - size.height / 2, rotation: normalizeRotation(c.rotation + 90) };
+      };
+      if (comp.type === 'breadboard') {
+        const carried = new Set(state.wires.filter((w) => w.plug && w.toComponentId === id).map((w) => w.fromComponentId));
+        return { components: state.components.map((c) => (c.id === id || carried.has(c.id) ? rotateAbout(c) : c)) };
+      }
+      return {
+        components: state.components.map((c) => (c.id === id ? { ...c, rotation: normalizeRotation(c.rotation + 90) } : c)),
+        wires: state.wires.filter((w) => !(w.plug && w.fromComponentId === id)),
+      };
+    });
+    get().settleComponent(id);
   },
 
   updateComponentProperty: (id, property, value) => {

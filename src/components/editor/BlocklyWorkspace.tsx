@@ -53,7 +53,7 @@ export const BlocklyWorkspace: React.FC = () => {
       zoom: {
         controls: true,
         wheel: true,
-        startScale: 0.95,
+        startScale: 0.9,
         maxScale: 2,
         minScale: 0.5,
         scaleSpeed: 1.1,
@@ -81,7 +81,7 @@ export const BlocklyWorkspace: React.FC = () => {
     } else {
       // Sketch inicial (parpadeo). Se carga desde XML para que Blockly conecte bien los números a cada "Esperar".
       const seed = `<xml xmlns="https://developers.google.com/blockly/xml">
-        <block type="arduino_base" x="30" y="25">
+        <block type="arduino_base" x="20" y="20">
           <statement name="SETUP"><block type="arduino_pin_mode"><field name="PIN">13</field></block></statement>
           <statement name="LOOP">
             <block type="arduino_digital_write"><field name="PIN">13</field><field name="STATE">HIGH</field>

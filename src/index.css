@@ -43,43 +43,62 @@
   background: #475569;
 }
 
-/* Ajustes Aesthetic de Google Blockly en Modo Oscuro */
+/* Ajustes estéticos de Google Blockly (renderer zelos) en modo oscuro */
 .blocklyMainBackground {
   stroke-width: 0 !important;
 }
 
-.blocklyToolboxDiv {
-  background-color: #0b132b !important;
+.blocklyToolbox {
+  background-color: #0b1220 !important;
   border-right: 1px solid #1e293b !important;
-  color: #cbd5e1 !important;
-  padding: 6px 4px !important;
+  padding: 8px 6px !important;
+  box-sizing: border-box;
 }
 
-.blocklyTreeRow {
-  height: 32px !important;
-  line-height: 32px !important;
-  padding-left: 8px !important;
-  border-radius: 8px !important;
-  margin-bottom: 2px !important;
-  transition: all 0.15s ease !important;
+.blocklyToolboxCategory {
+  height: auto !important;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  margin: 0 0 3px 0 !important;
+  padding: 4px 10px 4px 0 !important;
+  border-radius: 10px !important;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
 }
 
-.blocklyTreeRow:hover {
+.blocklyToolboxCategory:hover {
   background-color: #1e293b !important;
 }
 
-.blocklyTreeSelected {
-  background-color: #1e293b !important;
-}
-
-.blocklyTreeLabel {
+.blocklyToolboxCategoryLabel {
   font-family: inherit !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
   color: #e2e8f0 !important;
+  white-space: nowrap;
+}
+
+.blocklyToolboxSelected .blocklyToolboxCategoryLabel {
+  color: #ffffff !important;
 }
 
 .blocklyFlyoutBackground {
   fill: #0f172a !important;
-  fill-opacity: 0.96 !important;
+  fill-opacity: 0.97 !important;
+}
+
+.blocklyText,
+.blocklyDropdownText {
+  font-weight: 600 !important;
+}
+
+/* Pantallas angostas: el menú de categorías se compacta */
+@media (max-width: 640px) {
+  .blocklyToolboxCategoryLabel {
+    font-size: 11px !important;
+  }
+  .blocklyToolboxCategory {
+    min-height: 30px;
+  }
 }

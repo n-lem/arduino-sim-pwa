@@ -51,6 +51,8 @@ export interface WireConnection {
   toComponentId: string;
   toPinId: string;
   color: string;
+  /** `true` si es una unión por encaje en una protoboard (no se dibuja como cable). */
+  plug?: boolean;
 }
 
 export type ViewMode = 'circuit' | 'blocks' | 'code' | 'serial';

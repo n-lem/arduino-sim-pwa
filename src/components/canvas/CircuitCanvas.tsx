@@ -12,7 +12,7 @@ import { useCircuitStore } from '../../stores/useCircuitStore';
 import { useSimulationStore } from '../../stores/useSimulationStore';
 import type { ComponentType } from '../../types/circuit';
 import type { BreadboardSize } from '../../core/breadboard';
-import { ZoomIn, ZoomOut, RotateCcw, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, RotateCw, XCircle, CheckCircle2, AlertTriangle, MoreHorizontal, X, Plus, Trash2, SlidersHorizontal } from 'lucide-react';
 
 interface CircuitCanvasProps {
   isRunning: boolean;
@@ -27,6 +27,8 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
     addComponent,
     removeComponent,
     updateComponentPosition,
+    settleComponent,
+    rotateComponent,
     updateComponentProperty,
     selectComponent,
     handlePinTouch,
@@ -61,6 +63,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
     }
     panRef.current = null;
   };
+  const [panel, setPanel] = useState<'none' | 'menu' | 'add' | 'props'>('none');
   const [wireNotice, setWireNotice] = useState<string | null>(null);
 
   const selectedComponent = components.find((c) => c.id === selectedPin?.componentId);
@@ -81,13 +84,16 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [contenteditable="true"], .cm-editor, .blocklyWidgetDiv')) return;
+      if ((e.key === 'r' || e.key === 'R') && selectedComponentId && !e.ctrlKey && !e.metaKey) {
+        rotateComponent(selectedComponentId);
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
         removeComponent(selectedComponentId);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedComponentId, removeComponent]);
+  }, [selectedComponentId, removeComponent, rotateComponent]);
 
   const handleAddComponent = (type: ComponentType, options?: { size?: BreadboardSize }) => {
     addComponent(type, undefined, undefined, options);
@@ -225,22 +231,103 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({ isRunning }) => {
             onDelete={removeComponent}
             onPropertyChange={updateComponentProperty}
             onDrag={updateComponentPosition}
+            onDrop={settleComponent}
+            onRotate={rotateComponent}
           />
         ))}
       </div>
 
-      {/* Paleta Flotante de Componentes (Bottom Center) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-2">
-        {selectedProps && (
+      {/* Menú flotante "⋯": acciones del componente seleccionado, agregar y restablecer vista */}
+      <div
+        className="absolute bottom-3 right-3 z-40 flex flex-col items-end gap-2 pointer-events-auto"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {panel === 'add' && <ComponentPalette onAddComponent={handleAddComponent} onClose={() => setPanel('none')} />}
+        {panel === 'props' && selectedProps && (
           <PropertiesPanel
             component={selectedProps}
             onChange={(prop, value) => updateComponentProperty(selectedProps.id, prop, value)}
-            onDelete={() => removeComponent(selectedProps.id)}
-            onClose={() => selectComponent(null)}
+            onDelete={() => {
+              removeComponent(selectedProps.id);
+              setPanel('none');
+            }}
+            onClose={() => setPanel('none')}
           />
         )}
-        <ComponentPalette onAddComponent={handleAddComponent} />
+        {panel === 'menu' && (
+          <div className="w-56 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl p-1.5 text-sm text-slate-200">
+            {selectedProps && (
+              <>
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-400 truncate">
+                  {selectedProps.name}
+                </div>
+                <MenuItem icon={SlidersHorizontal} label="Propiedades" onClick={() => setPanel('props')} />
+                <MenuItem
+                  icon={RotateCw}
+                  label="Rotar 90° (R)"
+                  onClick={() => {
+                    rotateComponent(selectedProps.id);
+                    setPanel('none');
+                  }}
+                />
+                <MenuItem
+                  icon={Trash2}
+                  label="Eliminar"
+                  danger
+                  onClick={() => {
+                    removeComponent(selectedProps.id);
+                    setPanel('none');
+                  }}
+                />
+                <div className="my-1 border-t border-slate-700" />
+              </>
+            )}
+            <MenuItem icon={Plus} label="Agregar componente" onClick={() => setPanel('add')} />
+            <MenuItem
+              icon={RotateCcw}
+              label="Restablecer vista"
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+                setPanel('none');
+              }}
+            />
+          </div>
+        )}
+        <button
+          onClick={() => setPanel((p) => (p === 'none' ? 'menu' : 'none'))}
+          className="relative w-12 h-12 rounded-full bg-arduino-teal hover:brightness-110 text-white shadow-2xl border border-teal-300/30 flex items-center justify-center active:scale-95 transition"
+          aria-label="Más opciones"
+          aria-expanded={panel !== 'none'}
+          title="Más opciones"
+        >
+          {panel === 'none' ? <MoreHorizontal className="w-6 h-6" /> : <X className="w-6 h-6" />}
+          {selectedProps && panel === 'none' && (
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-950" />
+          )}
+        </button>
       </div>
     </div>
   );
 };
+
+interface MenuItemProps {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}
+
+/** Fila táctil del menú flotante. */
+const MenuItem: React.FC<MenuItemProps> = ({ icon: Icon, label, onClick, danger }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition active:scale-[0.98] ${
+      danger ? 'text-red-300 hover:bg-red-500/15' : 'hover:bg-slate-800'
+    }`}
+  >
+    <Icon className="w-4 h-4 shrink-0" />
+    {label}
+  </button>
+);

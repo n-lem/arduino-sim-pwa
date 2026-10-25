@@ -5,6 +5,7 @@
 
 import React from 'react';
 import type { CircuitComponent, WireConnection } from '../../types/circuit';
+import { getPinPosition } from '../../core/geometry';
 
 interface WireLayerProps {
   wires: WireConnection[];
@@ -26,7 +27,7 @@ export const WireLayer: React.FC<WireLayerProps> = ({
         </filter>
       </defs>
 
-      {wires.map((wire) => {
+      {wires.filter((w) => !w.plug).map((wire) => {
         const fromComp = components.find((c) => c.id === wire.fromComponentId);
         const toComp = components.find((c) => c.id === wire.toComponentId);
         if (!fromComp || !toComp) return null;
@@ -35,10 +36,10 @@ export const WireLayer: React.FC<WireLayerProps> = ({
         const toPin = toComp.pins.find((p) => p.id === wire.toPinId);
         if (!fromPin || !toPin) return null;
 
-        const x1 = fromComp.x + fromPin.x;
-        const y1 = fromComp.y + fromPin.y;
-        const x2 = toComp.x + toPin.x;
-        const y2 = toComp.y + toPin.y;
+        const p1 = getPinPosition(fromComp, fromPin);
+        const p2 = getPinPosition(toComp, toPin);
+        const { x: x1, y: y1 } = p1;
+        const { x: x2, y: y2 } = p2;
 
         // Cálculo de curvatura Bézier natural (estilo protoboard / cable con peso)
         const dx = Math.abs(x2 - x1);

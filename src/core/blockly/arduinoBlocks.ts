@@ -26,9 +26,8 @@ export function registerArduinoBlocks(): void {
   // 1. Estructura Principal: Setup y Loop
   Blockly.Blocks['arduino_base'] = {
     init: function () {
-      this.appendDummyInput().appendField('🟢 Programa principal');
-      this.appendStatementInput('SETUP').appendField('⚙️ Configuración (setup - se ejecuta una vez):');
-      this.appendStatementInput('LOOP').appendField('🔁 Bucle Principal (loop - se repite siempre):');
+      this.appendStatementInput('SETUP').appendField('Al iniciar');
+      this.appendStatementInput('LOOP').appendField('Repetir siempre');
       this.setColour('#00979D');
       this.setTooltip('Estructura obligatoria de un programa en Arduino.');
       this.setHelpUrl('');
@@ -40,14 +39,14 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_pin_mode'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('Configurar Pin')
+        .appendField('Pin')
         .appendField(new Blockly.FieldDropdown(pinMenu('any')), 'PIN')
         .appendField('como')
         .appendField(
           new Blockly.FieldDropdown([
-            ['SALIDA (OUTPUT)', 'OUTPUT'],
-            ['ENTRADA (INPUT)', 'INPUT'],
-            ['ENTRADA CON RESISTENCIA (INPUT_PULLUP)', 'INPUT_PULLUP'],
+            ['salida', 'OUTPUT'],
+            ['entrada', 'INPUT'],
+            ['entrada con pull-up', 'INPUT_PULLUP'],
           ]),
           'MODE'
         );
@@ -62,13 +61,13 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_digital_write'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('Escribir en Pin Digital')
+        .appendField('Pin')
         .appendField(new Blockly.FieldDropdown(pinMenu('output')), 'PIN')
-        .appendField('estado')
+        .appendField('en')
         .appendField(
           new Blockly.FieldDropdown([
-            ['ALTO / ENCENDIDO (HIGH)', 'HIGH'],
-            ['BAJO / APAGADO (LOW)', 'LOW'],
+            ['ALTO (HIGH)', 'HIGH'],
+            ['BAJO (LOW)', 'LOW'],
           ]),
           'STATE'
         );
@@ -83,7 +82,7 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_digital_read'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('Leer Pin Digital')
+        .appendField('Leer pin digital')
         .appendField(new Blockly.FieldDropdown(pinMenu('digital')), 'PIN');
       this.setOutput(true, 'Boolean');
       this.setColour('#2563EB');
@@ -96,8 +95,9 @@ export function registerArduinoBlocks(): void {
     init: function () {
       this.appendValueInput('MS')
         .setCheck('Number')
-        .appendField('⏱️ Esperar');
-      this.appendDummyInput().appendField('milisegundos');
+        .appendField('Esperar');
+      this.appendDummyInput().appendField('ms');
+      this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour('#D97706');
@@ -109,11 +109,12 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_analog_write'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('Escribir PWM en Pin')
+        .appendField('PWM en pin')
         .appendField(new Blockly.FieldDropdown(pinMenu('pwm')), 'PIN');
       this.appendValueInput('VALUE')
         .setCheck('Number')
-        .appendField('valor (0 a 255):');
+        .appendField('valor (0–255)');
+      this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour('#7C3AED');
@@ -125,7 +126,7 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_analog_read'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('Leer Pin Analógico')
+        .appendField('Leer pin analógico')
         .appendField(new Blockly.FieldDropdown(pinMenu('analog')), 'PIN');
       this.setOutput(true, 'Number');
       this.setColour('#7C3AED');
@@ -137,15 +138,16 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_serial_print'] = {
     init: function () {
       this.appendValueInput('TEXT')
-        .appendField('📟 Imprimir en Monitor Serial');
+        .appendField('Imprimir en serial');
       this.appendDummyInput()
         .appendField(
           new Blockly.FieldDropdown([
-            ['con salto de línea (println)', 'PRINTLN'],
-            ['sin salto de línea (print)', 'PRINT'],
+            ['con salto de línea', 'PRINTLN'],
+            ['sin salto de línea', 'PRINT'],
           ]),
           'TYPE'
         );
+      this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour('#059669');
@@ -157,11 +159,12 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_servo_write'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('⚙️ Mover Servo SG90 en Pin')
+        .appendField('Servo en pin')
         .appendField(new Blockly.FieldDropdown(pinMenu('pwm')), 'PIN');
       this.appendValueInput('ANGLE')
         .setCheck('Number')
-        .appendField('a ángulo (0° a 180°):');
+        .appendField('ángulo (0–180°)');
+      this.setInputsInline(true);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour('#EA580C');
@@ -173,10 +176,9 @@ export function registerArduinoBlocks(): void {
   Blockly.Blocks['arduino_ultrasonic_read'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField('📏 Distancia Ultrasónico HC-SR04')
-        .appendField('Trig:')
+        .appendField('Distancia (cm) Trig')
         .appendField(new Blockly.FieldDropdown(pinMenu('output')), 'TRIG')
-        .appendField('Echo:')
+        .appendField('Echo')
         .appendField(new Blockly.FieldDropdown(pinMenu('digital')), 'ECHO');
       this.setOutput(true, 'Number');
       this.setColour('#0284C7');

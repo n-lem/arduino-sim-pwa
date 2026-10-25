@@ -6,6 +6,27 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ---
 
+## [1.6.0] - Bloques más prolijos, menú ⋯, encaje y rotación
+
+### Agregado
+- **Menú flotante "⋯"** abajo a la derecha (con punto indicador si hay un componente seleccionado): Propiedades, Rotar, Eliminar, Agregar componente y Restablecer vista.
+- **Rotación** de componentes en pasos de 90° (botón, menú o tecla `R`). Los cables siguen a los pines rotados (`core/geometry.ts`).
+- **Encaje automático en la protoboard**: al soltar un componente sus patas se enchufan solas en los agujeros (sin cables visibles). Mover o rotar la protoboard arrastra lo enchufado.
+- **Resaltado de tiras**: al pasar el mouse (o seleccionar un agujero) se pintan los contactos conectados entre sí.
+- La paleta ofrece una sola "Protoboard (mediana)"; el tamaño se cambia desde Propiedades.
+- Tests de geometría y encaje (35 en total).
+
+### Cambiado
+- Bloques con textos cortos, sin emojis y en línea; estilo del menú de categorías reescrito para el renderer zelos.
+
+### Corregido
+- Al importar/restaurar, los pines de la protoboard se regeneran (no se guardan ~800 pines) y se conservan los cables de encaje.
+
+### Pendiente (hallazgos de la auditoría)
+- La exportación PNG toma solo la capa de cables; `tone()` sin buzzer del solver; `Serial.readString()`; parámetros por referencia escalares; validación de JSON importado; estado de autoguardado ante fallos de IndexedDB.
+
+---
+
 ## [1.5.0] - Protoboard y desplazamiento del lienzo
 
 ### Agregado

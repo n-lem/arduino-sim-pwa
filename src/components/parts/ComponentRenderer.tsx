@@ -20,7 +20,7 @@ import { SwitchPart } from './SwitchPart';
 import { LdrPart } from './LdrPart';
 import { MultimeterPart } from './MultimeterPart';
 import { BreadboardPart } from './BreadboardPart';
-import { Trash2 } from 'lucide-react';
+import { RotateCw, Trash2 } from 'lucide-react';
 
 interface ComponentRendererProps {
   component: CircuitComponent;
@@ -32,6 +32,9 @@ interface ComponentRendererProps {
   onDelete: (componentId: string) => void;
   onPropertyChange: (componentId: string, property: string, value: any) => void;
   onDrag: (componentId: string, x: number, y: number) => void;
+  /** Se llama al soltar el componente (encaje en protoboard). */
+  onDrop?: (componentId: string) => void;
+  onRotate?: (componentId: string) => void;
 }
 
 export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
@@ -44,6 +47,8 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   onDelete,
   onPropertyChange,
   onDrag,
+  onDrop,
+  onRotate,
 }) => {
   const [isDragging, setIsDragging] = React.useState(false);
   const dragRef = React.useRef({ startX: 0, startY: 0, compX: 0, compY: 0 });
@@ -77,6 +82,7 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   const handlePointerUp = (e: React.PointerEvent) => {
     if (isDragging) {
       setIsDragging(false);
+      onDrop?.(component.id);
       try {
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
       } catch {
@@ -88,7 +94,8 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   return (
     <div
       style={{
-        transform: `translate(${component.x}px, ${component.y}px)`,
+        transform: `translate(${component.x}px, ${component.y}px) rotate(${component.rotation}deg)`,
+        transformOrigin: 'center',
         zIndex: component.type === 'breadboard' ? 0 : 2,
         touchAction: 'none',
       }}
@@ -103,6 +110,18 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
       }`}
     >
       {/* Botón flotante para eliminar componente cuando está seleccionado */}
+      {isSelected && onRotate && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRotate(component.id);
+          }}
+          className="absolute -top-3 -left-3 z-30 p-1.5 rounded-full bg-arduino-teal hover:brightness-110 text-slate-900 shadow-lg active:scale-90 transition cursor-pointer"
+          title="Rotar 90° (R)"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+        </button>
+      )}
       {isSelected && (
         <button
           onClick={(e) => {

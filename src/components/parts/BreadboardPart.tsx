@@ -7,7 +7,7 @@
 import React from 'react';
 import type { CircuitComponent } from '../../types/circuit';
 import type { SelectedPinInfo } from '../../stores/useCircuitStore';
-import { BREADBOARD_SIZES, BREADBOARD_HEIGHT, ROW_Y, breadboardWidth, columnX, isBreadboardSize } from '../../core/breadboard';
+import { BREADBOARD_SIZES, BREADBOARD_HEIGHT, ROW_Y, breadboardGroups, breadboardWidth, columnX, isBreadboardSize } from '../../core/breadboard';
 
 interface BreadboardPartProps {
   component: CircuitComponent;
@@ -22,6 +22,15 @@ export const BreadboardPart: React.FC<BreadboardPartProps> = React.memo(({ compo
   const { columns } = BREADBOARD_SIZES[size];
   const width = breadboardWidth(columns);
   const selectedId = selectedPin?.componentId === component.id ? selectedPin.pinId : null;
+
+  // Tira (pines conectados entre sí) del agujero bajo el mouse o, en pantallas táctiles, del seleccionado.
+  const [hoverId, setHoverId] = React.useState<string | null>(null);
+  const groups = React.useMemo(() => breadboardGroups(component), [component]);
+  const activeId = hoverId ?? selectedId;
+  const stripIds = React.useMemo(() => {
+    const g = activeId ? groups.find((grp) => grp.includes(activeId)) : undefined;
+    return g ? new Set(g) : null;
+  }, [groups, activeId]);
 
   const labelCols = Array.from({ length: columns }, (_, i) => i + 1).filter((c) => c === 1 || c % 5 === 0);
 
@@ -54,10 +63,13 @@ export const BreadboardPart: React.FC<BreadboardPartProps> = React.memo(({ compo
 
         {component.pins.map((pin) => {
           const selected = selectedId === pin.id;
+          const inStrip = stripIds?.has(pin.id) ?? false;
           return (
             <g
               key={pin.id}
               className="cursor-pointer"
+              onPointerEnter={() => setHoverId(pin.id)}
+              onPointerLeave={() => setHoverId((h) => (h === pin.id ? null : h))}
               onClick={(e) => {
                 e.stopPropagation();
                 onPinTouch(component.id, pin.id);
@@ -65,6 +77,7 @@ export const BreadboardPart: React.FC<BreadboardPartProps> = React.memo(({ compo
             >
               <title>{pin.name}</title>
               <circle cx={pin.x} cy={pin.y} r="6.5" fill="transparent" />
+              {inStrip && <circle cx={pin.x} cy={pin.y} r="5" fill="#2DD4BF" fillOpacity="0.55" stroke="#0D9488" strokeWidth="1" />}
               <circle
                 cx={pin.x}
                 cy={pin.y}

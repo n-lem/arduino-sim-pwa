@@ -4,12 +4,13 @@
  */
 
 import React from 'react';
-import { Plus, X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu, Sun, ToggleLeft, Grid3x3 } from 'lucide-react';
+import { X, Battery, Zap, CircleDot, Radio, Gauge, Sliders, Volume2, Cpu, Sun, ToggleLeft, Grid3x3 } from 'lucide-react';
 import type { ComponentType } from '../../types/circuit';
-import { BREADBOARD_SIZE_LIST, type BreadboardSize } from '../../core/breadboard';
+import type { BreadboardSize } from '../../core/breadboard';
 
 interface ComponentPaletteProps {
   onAddComponent: (type: ComponentType, options?: { size?: BreadboardSize }) => void;
+  onClose: () => void;
 }
 
 interface ComponentItem {
@@ -34,14 +35,16 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
-    title: 'Protoboards',
-    items: BREADBOARD_SIZE_LIST.map((b) => ({
-      type: 'breadboard' as ComponentType,
-      label: `Protoboard ${b.label.toLowerCase()}`,
-      hint: b.hint,
-      icon: Grid3x3,
-      size: b.size,
-    })),
+    title: 'Protoboard',
+    items: [
+      {
+        type: 'breadboard' as ComponentType,
+        label: 'Protoboard (mediana)',
+        hint: 'Tamaño editable desde Propiedades',
+        icon: Grid3x3,
+        size: 'medium' as BreadboardSize,
+      },
+    ],
   },
   {
     title: 'Fuentes de energía',
@@ -80,50 +83,45 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-export const ComponentPalette: React.FC<ComponentPaletteProps> = ({ onAddComponent }) => {
-  const [open, setOpen] = React.useState(false);
-
+export const ComponentPalette: React.FC<ComponentPaletteProps> = ({ onAddComponent, onClose }) => {
   return (
-    <div className="flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-      {open && (
-        <div className="w-[94vw] max-w-lg max-h-[55vh] overflow-y-auto bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl p-3">
-          {CATEGORIES.map((cat) => (
-            <section key={cat.title} className="mb-3 last:mb-0">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-teal-400 mb-1.5">{cat.title}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {cat.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.size ? `${item.type}-${item.size}` : item.type}
-                      onClick={() => {
-                        onAddComponent(item.type, item.size ? { size: item.size } : undefined);
-                        setOpen(false);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-left transition active:scale-[0.98]"
-                    >
-                      <Icon className="w-5 h-5 text-teal-300 shrink-0" />
-                      <span className="min-w-0">
-                        <span className="block text-sm text-white">{item.label}</span>
-                        <span className="block text-[11px] text-slate-400 truncate">{item.hint}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-arduino-teal hover:bg-arduino-darkTeal text-white text-sm font-semibold shadow-2xl border border-teal-300/30 active:scale-95 transition"
-        aria-expanded={open}
-      >
-        {open ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        {open ? 'Cerrar' : 'Agregar componente'}
-      </button>
+    <div
+      className="w-[94vw] max-w-lg max-h-[60vh] overflow-y-auto bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl p-3"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-white">Agregar componente</h3>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400" title="Cerrar">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      {CATEGORIES.map((cat) => (
+        <section key={cat.title} className="mb-3 last:mb-0">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-teal-400 mb-1.5">{cat.title}</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {cat.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.size ? `${item.type}-${item.size}` : item.type}
+                  onClick={() => {
+                    onAddComponent(item.type, item.size ? { size: item.size } : undefined);
+                    onClose();
+                  }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-left transition active:scale-[0.98]"
+                >
+                  <Icon className="w-5 h-5 text-teal-300 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm text-white">{item.label}</span>
+                    <span className="block text-[11px] text-slate-400 truncate">{item.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 };
